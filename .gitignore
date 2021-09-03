@@ -1,0 +1,6 @@
+**/node_modules/**
+package-lock.json
+
+**/application.properties
+hermes-mailer/src/main/resources/application.properties
+hermes-mailer/src/main/resources/application.compose.properties

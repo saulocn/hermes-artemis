@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "hermes-api"
+		},
+		{
+			"name": "hermes-mailer",
+			"path": "hermes-mailer"
+		},
+		{
+			"path": "kafka"
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "automatic"
+	}
+}

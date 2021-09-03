@@ -1,0 +1,29 @@
+{
+    "dev": {
+      "name": "Hermes API",
+      "port": 3000,
+      "mode": "development",
+      "protocol": "http",
+      "serverUrl": "localhost",
+      "serverUrlWebUrlLink": "localhost:3000/",
+      "database": {
+        "host": "localhost",
+        "port": "27017",
+        "user": "root",
+        "password": "testdocker",
+        "database": ""
+      },
+      "pulsar": {
+        "host": "localhost",
+        "port": "6650",
+        "topic": "message-topic",
+        "consumer": "nodejs-hermes-sub"
+      },
+      "email": {
+        "host": "",
+        "port": "",
+        "username": "",
+        "password": ""
+      }
+    }
+  }

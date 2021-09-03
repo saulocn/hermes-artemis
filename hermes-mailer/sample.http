@@ -1,0 +1,9 @@
+###
+GET http://localhost:8080/hello-resteasy
+
+###
+GET http://localhost:8080/messages
+
+
+###
+POST http://localhost:8080/messages
