@@ -1,17 +1,17 @@
 {
 	"folders": [
 		{
+			"path": "artemis"
+		},
+		{
 			"path": "hermes-api"
 		},
 		{
-			"name": "hermes-mailer",
 			"path": "hermes-mailer"
 		},
 		{
-			"path": "kafka"
+			"path": "db"
 		}
 	],
-	"settings": {
-		"java.configuration.updateBuildConfiguration": "automatic"
-	}
+	"settings": {}
 }

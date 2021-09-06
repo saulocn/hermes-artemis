@@ -1,0 +1,4 @@
+FROM postgres
+
+ENV POSTGRES_USER hermes
+ENV POSTGRES_PASSWORD pass_hermes
