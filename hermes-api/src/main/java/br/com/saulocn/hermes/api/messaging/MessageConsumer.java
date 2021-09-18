@@ -1,43 +1,35 @@
 package br.com.saulocn.hermes.api.messaging;
 
-import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.StartupEvent;
+import br.com.saulocn.hermes.api.service.MessageService;
+import br.com.saulocn.hermes.api.vo.MessageVO;
+import io.smallrye.common.annotation.Blocking;
+import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.eclipse.microprofile.reactive.messaging.Outgoing;
 
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.event.Observes;
 import javax.inject.Inject;
-import javax.jms.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import javax.transaction.Transactional;
 
 @ApplicationScoped
-public class MessageConsumer implements Runnable {
+public class MessageConsumer {
 
     @Inject
-    ConnectionFactory connectionFactory;
+    MessageService messageService;
 
-    private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
-
-
-    void onStart(@Observes StartupEvent ev) {
-        scheduler.submit(this);
+    @Incoming("message-in")
+    @Transactional
+    public void receiveMessage(String incomingMessage) {
+        MessageVO messageVO = MessageVO.fromJSON(incomingMessage);
+        System.out.println("Chegou! "+ messageVO.getId());
+        messageService.processMessage(messageVO.getId());
     }
 
-    void onStop(@Observes ShutdownEvent ev) {
-        scheduler.shutdown();
-    }
 
-    @Override
-    public void run() {
-        try (JMSContext context = connectionFactory.createContext(Session.AUTO_ACKNOWLEDGE)) {
-            JMSConsumer consumer = context.createConsumer(context.createQueue("MessageQueue"));
-            while (true) {
-                Message message = consumer.receive();
-                String mensagem = message.getBody(String.class);
-                System.out.println(mensagem);
-            }
-        } catch (JMSException e) {
-            e.printStackTrace();
-        }
+    @Incoming("init-request")
+    @Outgoing("message-out")
+    public String sendMessage(MessageVO message) {
+        System.out.println(message);
+        return message.toJSON();
     }
 }

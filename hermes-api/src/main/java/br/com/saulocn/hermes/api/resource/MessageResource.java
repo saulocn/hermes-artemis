@@ -17,11 +17,6 @@ public class MessageResource {
     @Inject
     MessageService messageService;
 
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    public String hello() {
-        return "Hello RESTEasy";
-    }
 
     @POST
     @Transactional

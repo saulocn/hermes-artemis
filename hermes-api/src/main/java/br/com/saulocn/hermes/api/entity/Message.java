@@ -17,11 +17,15 @@ public class Message {
     @Lob
     private byte[] recipients;
 
+
+    private Boolean processed;
+
     public static Message of(MessageVO messageVO) {
         Message message = new Message();
         message.setText(messageVO.getText());
         message.setTitle(messageVO.getTitle());
         message.setRecipients(messageVO.getJsonRecipients());
+        message.setProcessed(false);
         return message;
     }
 
@@ -51,6 +55,14 @@ public class Message {
 
     public void addRecipients(List<String> recipients) {
         recipients.addAll(recipients);
+    }
+
+    public Boolean getProcessed() {
+        return processed;
+    }
+
+    public void setProcessed(Boolean processed) {
+        this.processed = processed;
     }
 
     public byte[] getRecipients() {
