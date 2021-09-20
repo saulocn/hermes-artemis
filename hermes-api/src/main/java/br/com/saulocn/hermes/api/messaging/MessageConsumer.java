@@ -1,5 +1,7 @@
 package br.com.saulocn.hermes.api.messaging;
 
+import br.com.saulocn.hermes.api.service.MessageService;
+import br.com.saulocn.hermes.api.vo.MessageVO;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 
@@ -15,6 +17,9 @@ public class MessageConsumer implements Runnable {
 
     @Inject
     ConnectionFactory connectionFactory;
+
+    @Inject
+    MessageService messageService;
 
     private final ExecutorService scheduler = Executors.newSingleThreadExecutor();
 
@@ -35,6 +40,7 @@ public class MessageConsumer implements Runnable {
                 Message message = consumer.receive();
                 String mensagem = message.getBody(String.class);
                 System.out.println(mensagem);
+                messageService.process(MessageVO.fromJSON(mensagem));
             }
         } catch (JMSException e) {
             e.printStackTrace();

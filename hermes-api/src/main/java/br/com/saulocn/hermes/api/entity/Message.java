@@ -14,6 +14,7 @@ public class Message {
     private Long id;
     private String title;
     private String text;
+    private boolean processed;
     @Lob
     private byte[] recipients;
 
@@ -31,6 +32,14 @@ public class Message {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public boolean isProcessed() {
+        return processed;
+    }
+
+    public void setProcessed(boolean processed) {
+        this.processed = processed;
     }
 
     public String getTitle() {
