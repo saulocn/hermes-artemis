@@ -1,44 +1,44 @@
 package br.com.saulocn.hermes.mailer.service;
 
-import br.com.saulocn.hermes.mailer.model.Message;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
-import org.bson.types.ObjectId;
+import br.com.saulocn.hermes.mailer.service.vo.MailVO;
+import br.com.saulocn.hermes.mailer.service.vo.MessageVO;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
+import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 
-import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import java.util.ArrayList;
-import java.util.List;
+import javax.transaction.Transactional;
 
-import static com.mongodb.client.model.Filters.eq;
-
-@ApplicationScoped
 public class MessageService {
 
     @Inject
-    MongoClient mongoClient;
+    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
+    @Channel("mail-requests")
+    Emitter<String> emitter;
 
-    public List<Message> list() {
-        List<Message> messages = new ArrayList<>();
-        MongoCursor<Message> cursor = getCollection().find().iterator();
+    @Incoming("message-requests")
+    public void sendMails(String jsonMessageVO) {
+        var messageVO = MessageVO.fromJSON(jsonMessageVO);
+        messageVO.getRecipients().forEach(recipient -> sendMail(messageVO, recipient));
+        System.out.println(messageVO);
+    }
+
+    private void sendMail(MessageVO messageVO, String recipient) {
+        var mail = MailVO.of(messageVO.getTitle(), messageVO.getText(), messageVO.getContentType(), recipient);
+        emitter.send(mail.toJSON());
+    }
+
+
+    @Incoming("mail")
+    @Transactional
+    public void mailConsumer(String jsonMessageVO) {
         try {
-            while (cursor.hasNext()) {
-                messages.add(cursor.next());
-            }
-        } finally {
-            cursor.close();
+            Thread.sleep(2000);
+            System.out.println("sending email" + jsonMessageVO);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-
-        return messages;
     }
 
-    public Message findById(String id) {
-        return (Message) getCollection().find(eq("_id", new ObjectId(id))).first();
-    }
-
-
-    private MongoCollection getCollection() {
-        return mongoClient.getDatabase("hermes").getCollection("messages", Message.class);
-    }
 }

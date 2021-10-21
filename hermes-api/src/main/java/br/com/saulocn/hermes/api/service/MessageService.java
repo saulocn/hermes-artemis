@@ -1,42 +1,31 @@
 package br.com.saulocn.hermes.api.service;
 
 import br.com.saulocn.hermes.api.entity.Message;
-import br.com.saulocn.hermes.api.messaging.MessageProducer;
-import br.com.saulocn.hermes.api.vo.MessageVO;
+import br.com.saulocn.hermes.api.resource.request.MessageVO;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
-import javax.transaction.Transactional;
 
 @ApplicationScoped
 public class MessageService {
 
+    @Inject
+    EntityManager em;
 
     @Inject
-    MessageProducer messageProducer;
+    @Channel("message-requests")
+    Emitter<String> emitter;
 
-    @Inject
-    EntityManager entityManager;
-
-    public Message sendMessage(MessageVO messageVO) {
+    public void sendMail(MessageVO messageVO){
         Message message = Message.of(messageVO);
-        entityManager.persist(message);
+        em.persist(message);
         messageVO.setId(message.getId());
-        messageProducer.send(messageVO);
-        return message;
+        System.out.println(messageVO);
+        emitter.send(messageVO.toJSON());
     }
 
-    @Transactional
-    public void process(MessageVO messageVO) {
-        Message message = entityManager.find(Message.class, messageVO.getId());
-
-        System.out.println("Mensagem encontrada: "+message);
-        if(message!=null) {
-            System.out.println("Processando");
-            message.setProcessed(true);
-            entityManager.merge(message);
-        }
-
-    }
 }

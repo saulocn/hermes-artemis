@@ -13,4 +13,6 @@ public class HelloWorldResource {
     public String hello() {
         return "Hello RESTEasy";
     }
+
+
 }

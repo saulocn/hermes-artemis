@@ -1,6 +1,7 @@
 package br.com.saulocn.hermes.api.entity;
 
-import br.com.saulocn.hermes.api.vo.MessageVO;
+
+import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
 import javax.persistence.*;
 import java.util.List;
