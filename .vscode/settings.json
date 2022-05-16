@@ -1,0 +1,15 @@
+{
+    "makefile.extensionOutputFolder": "./.vscode",
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "hermes",
+            "database": "hermes",
+            "username": "hermes",
+            "password": "pass_hermes"
+        }
+    ]
+}

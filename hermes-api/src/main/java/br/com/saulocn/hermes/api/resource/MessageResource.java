@@ -1,5 +1,6 @@
 package br.com.saulocn.hermes.api.resource;
 
+import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 import br.com.saulocn.hermes.api.service.MessageService;
 import org.eclipse.microprofile.reactive.messaging.Channel;
@@ -23,7 +24,7 @@ public class MessageResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(MessageVO messageVO) {
-        messageService.sendMail(messageVO);
-        return Response.ok().build();
+        Message message = messageService.sendMail(messageVO);
+        return Response.ok().entity(message).build();
     }
 }
