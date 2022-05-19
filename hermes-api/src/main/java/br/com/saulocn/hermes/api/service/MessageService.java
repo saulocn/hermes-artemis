@@ -25,4 +25,7 @@ public class MessageService {
         return message;
     }
 
+    public List<Message> listMail() {
+        return em.createQuery("select m from Message m", Message.class).getResultList();
+    }
 }

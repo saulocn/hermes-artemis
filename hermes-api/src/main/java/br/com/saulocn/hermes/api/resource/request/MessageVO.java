@@ -1,6 +1,5 @@
 package br.com.saulocn.hermes.api.resource.request;
 
-import javax.json.bind.JsonbBuilder;
 import java.util.List;
 
 public class MessageVO {
@@ -51,16 +50,4 @@ public class MessageVO {
         this.recipients = recipients;
     }
 
-    public byte[] getJsonRecipients() {
-        return JsonbBuilder.create().toJson(recipients).getBytes();
-    }
-
-
-    public static MessageVO fromJSON(String json) {
-        return JsonbBuilder.create().fromJson(json, MessageVO.class);
-    }
-
-    public String toJSON() {
-        return JsonbBuilder.create().toJson(this);
-    }
 }
