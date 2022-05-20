@@ -1,12 +1,7 @@
-package br.com.saulocn.hermes.api.entity;
+package br.com.saulocn.hermes.mailer.entity;
 
-
-import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
 import javax.persistence.*;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Entity
 public class Message {
@@ -17,13 +12,6 @@ public class Message {
     private Long id;
     private String title;
     private String text;
-
-    public static Message of(MessageVO messageVO) {
-        Message message = new Message();
-        message.setText(messageVO.getText());
-        message.setTitle(messageVO.getTitle());
-        return message;
-    }
 
     public Long getId() {
         return id;

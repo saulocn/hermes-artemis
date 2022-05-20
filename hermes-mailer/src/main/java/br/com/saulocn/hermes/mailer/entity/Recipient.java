@@ -1,11 +1,13 @@
-package br.com.saulocn.hermes.api.entity;
+package br.com.saulocn.hermes.mailer.entity;
 
 import javax.persistence.*;
 import java.util.Objects;
 
 @Entity
+@NamedQuery(name = Recipient.FIND_NOT_PROCESSED, query = "select r from Recipient r where r.processed = false")
 public class Recipient {
 
+    public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "sq_recipient")
@@ -15,6 +17,7 @@ public class Recipient {
     private Long messageId;
 
     private boolean sent;
+
 
     private boolean processed;
 

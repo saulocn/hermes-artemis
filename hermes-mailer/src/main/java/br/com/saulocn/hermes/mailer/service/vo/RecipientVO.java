@@ -1,41 +1,18 @@
-package br.com.saulocn.hermes.api.entity;
+package br.com.saulocn.hermes.mailer.service.vo;
 
-import javax.persistence.*;
+import javax.json.bind.JsonbBuilder;
 import java.util.Objects;
 
-@Entity
-public class Recipient {
+public class RecipientVO {
 
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO, generator = "sq_recipient")
-    @SequenceGenerator(name = "sq_recipient", sequenceName = "sq_recipient")
     private Long id;
     private String email;
     private Long messageId;
 
-    private boolean sent;
-
-    private boolean processed;
-
-    public Recipient() {
-    }
-
-    public Recipient(String email) {
-        this.email = email;
-    }
-
-    public Recipient(String email, Long messageId) {
+    public RecipientVO(Long id, String email, Long messageId) {
+        this.id = id;
         this.email = email;
         this.messageId = messageId;
-    }
-
-    public boolean isSent() {
-        return sent;
-    }
-
-    public void setSent(boolean sent) {
-        this.sent = sent;
     }
 
     public Long getId() {
@@ -62,20 +39,12 @@ public class Recipient {
         this.messageId = messageId;
     }
 
-    public boolean isProcessed() {
-        return processed;
-    }
-
-    public void setProcessed(boolean processed) {
-        this.processed = processed;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Recipient recipient = (Recipient) o;
-        return Objects.equals(email, recipient.email) && Objects.equals(messageId, recipient.messageId);
+        RecipientVO that = (RecipientVO) o;
+        return Objects.equals(email, that.email) && Objects.equals(messageId, that.messageId);
     }
 
     @Override
@@ -85,10 +54,14 @@ public class Recipient {
 
     @Override
     public String toString() {
-        return "Recipient{" +
+        return "RecipientVO{" +
                 "id=" + id +
                 ", email='" + email + '\'' +
                 ", messageId=" + messageId +
                 '}';
+    }
+
+    public String toJSON() {
+        return JsonbBuilder.create().toJson(this);
     }
 }

@@ -4,7 +4,7 @@
         <chunk checkpoint-policy="item" item-count="100">
             <reader ref="mailReader"/>
             <processor ref="mailProcessor"/>
-            <witer ref="mailWriter"/>
+            <writer ref="mailWriter"/>
         </chunk>
     </step>
 </job>
