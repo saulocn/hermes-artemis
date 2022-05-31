@@ -34,11 +34,13 @@ public class MessageService {
         RecipientVO recipientVO = RecipientVO.fromJSON(jsonMessageVO);
         Message message = entityManager.find(Message.class, recipientVO.getMessageId());
         Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
-        MailVO mailVO = new MailVO(recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
-        mailSenderService.sendAsyncHtmlMail(mailVO);
-        recipient.setSent(true);
-        entityManager.merge(recipient);
-        log.info("Sendint email: "+jsonMessageVO);
+        if(!recipient.isSent()) {
+            MailVO mailVO = new MailVO(recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
+            mailSenderService.sendAsyncHtmlMail(mailVO);
+            recipient.setSent(true);
+            entityManager.merge(recipient);
+            log.info("Sendint email: " + jsonMessageVO);
+        }
     }
 
 }
