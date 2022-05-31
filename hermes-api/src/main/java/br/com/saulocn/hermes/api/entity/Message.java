@@ -9,14 +9,21 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Entity
+@Table(schema = "hermes", name = "message")
 public class Message {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO, generator = "sq_message")
-    @SequenceGenerator(name = "sq_message", sequenceName = "sq_message")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "message_seq")
+    @SequenceGenerator(name = "message_seq", sequenceName = "message_seq", allocationSize = 1)
+    @Column(name = "message_id")
     private Long id;
+
+    @Column(name = "message_title")
     private String title;
+
+    @Column(name = "message_text")
     private String text;
+
 
     public static Message of(MessageVO messageVO) {
         Message message = new Message();

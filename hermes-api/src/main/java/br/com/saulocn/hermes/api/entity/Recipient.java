@@ -4,19 +4,27 @@ import javax.persistence.*;
 import java.util.Objects;
 
 @Entity
+@Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
-
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO, generator = "sq_recipient")
-    @SequenceGenerator(name = "sq_recipient", sequenceName = "sq_recipient")
+    @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
+    @SequenceGenerator(name = "recipient_seq", sequenceName = "recipient_seq", allocationSize = 1)
+    @Column(name = "recipient_id")
     private Long id;
+
+    @Column(name = "recipient_mail")
     private String email;
+
+    @Column(name = "message_id")
     private Long messageId;
 
+    @Column(name = "recipient_sent")
     private boolean sent;
 
+    @Column(name = "recipient_processed")
     private boolean processed;
+
 
     public Recipient() {
     }

@@ -15,6 +15,10 @@ public class RecipientVO {
         this.messageId = messageId;
     }
 
+
+    public RecipientVO() {
+    }
+
     public Long getId() {
         return id;
     }
@@ -63,5 +67,9 @@ public class RecipientVO {
 
     public String toJSON() {
         return JsonbBuilder.create().toJson(this);
+    }
+
+    public static RecipientVO fromJSON(String json) {
+        return JsonbBuilder.create().fromJson(json, RecipientVO.class);
     }
 }

@@ -1,6 +1,4 @@
 make all --print-data-base --no-builtin-variables --no-builtin-rules --question
-make: *** No rule to make target 'all'.  Stop.
-
 # GNU Make 4.2.1
 # Built for x86_64-pc-linux-gnu
 # Copyright (C) 1988-2016 Free Software Foundation, Inc.
@@ -8,7 +6,7 @@ make: *** No rule to make target 'all'.  Stop.
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Fri May 20 15:59:58 2022
+# Make data base, printed on Mon May 30 23:38:59 2022
 
 # Variables
 
@@ -51,7 +49,7 @@ VTE_VERSION = 6003
 # environment
 VSCODE_NLS_CONFIG = {"locale":"pt-br","availableLanguages":{},"_languagePackSupport":true}
 # environment
-JOURNAL_STREAM = 8:39674
+JOURNAL_STREAM = 8:44400
 # environment
 XDG_CONFIG_DIRS = /etc/xdg/xdg-cinnamon:/etc/xdg
 # environment
@@ -73,17 +71,17 @@ MANDATORY_PATH = /usr/share/gconf/cinnamon.mandatory.path
 # environment
 XDG_DATA_DIRS = /usr/share/cinnamon:/usr/share/gnome:/home/saulo/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:/usr/local/share:/usr/share:/var/lib/snapd/desktop
 # environment
-DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus,guid=daf45d55afd2785f43f090356287deb1
+DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus,guid=bcc34edc548d76847fcab15b62914953
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
-MANAGERPID = 1613
+MANAGERPID = 1659
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-79e675a1-0ec8-45a6-be0c-285645b39607.sock
+VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-3001b3d7-61aa-4ad5-abca-0a771d4887fc.sock
 # environment
-VSCODE_CWD = /home/saulo
+VSCODE_CWD = /home/saulo/Downloads
 # environment
 XDG_SESSION_PATH = /org/freedesktop/DisplayManager/Session0
 # environment
@@ -97,7 +95,7 @@ GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
 # environment
 LSCOLORS = Gxfxcxdxbxegedabagacad
 # environment
-SESSION_MANAGER = local/saulo-550XDA:@/tmp/.ICE-unix/1638,unix/saulo-550XDA:/tmp/.ICE-unix/1638
+SESSION_MANAGER = local/saulo-550XDA:@/tmp/.ICE-unix/1683,unix/saulo-550XDA:/tmp/.ICE-unix/1683
 # environment
 XDG_RUNTIME_DIR = /run/user/1000
 # environment
@@ -113,7 +111,7 @@ DISABLE_WAYLAND = 1
 # environment
 ELECTRON_RUN_AS_NODE = 1
 # environment
-INVOCATION_ID = f0c5b442fa8649de8d3c511b39483b63
+INVOCATION_ID = 2ae359be63a148bbbebd066e8395efb8
 # environment
 GDK_PIXBUF_MODULEDIR = /snap/code/97/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders
 # default
@@ -143,7 +141,7 @@ QT_QPA_PLATFORMTHEME = qt5ct
 # default
 .LOADED := 
 # environment
-SSH_AGENT_PID = 1711
+SSH_AGENT_PID = 1756
 # environment
 ORIGINAL_XDG_CURRENT_DESKTOP = X-Cinnamon
 # environment
@@ -261,7 +259,7 @@ CHROME_DESKTOP = code-url-handler.desktop
 # default
 .RECIPEPREFIX := 
 # environment
-TILIX_ID = 4751d613-2609-4a19-8aef-bcf1f3829633
+TILIX_ID = 9fe58d1b-85d2-4eae-822b-191de08713ee
 # environment
 LANG = C
 # environment
@@ -269,9 +267,9 @@ TERM = xterm-256color
 # environment
 _P9K_TTY = /dev/pts/1
 # environment
-VSCODE_PID = 8294
+VSCODE_PID = 29024
 # environment
-DBUS_STARTER_ADDRESS = unix:path=/run/user/1000/bus,guid=daf45d55afd2785f43f090356287deb1
+DBUS_STARTER_ADDRESS = unix:path=/run/user/1000/bus,guid=bcc34edc548d76847fcab15b62914953
 # variable set hash-table stats:
 # Load=130/1024=13%, Rehash=0, Collisions=11/152=7%
 
@@ -282,6 +280,9 @@ DBUS_STARTER_ADDRESS = unix:path=/run/user/1000/bus,guid=daf45d55afd2785f43f0903
 # Directories
 
 # . (device 59, inode 18612260): 14 files, no impossibilities.
+
+ 
+make: *** No rule to make target 'all'.  Stop.
 
 # 14 files, no impossibilities in 1 directories.
 
@@ -321,7 +322,6 @@ makefile:
 # Not a target:
 GNUmakefile:
 #  Implicit rule search has been done.
- 
 #  File does not exist.
 #  File has been updated.
 #  Failed to be updated.
@@ -340,6 +340,6 @@ GNUmakefile:
 # strcache performance: lookups = 25 / hit rate = 12%
 # hash-table stats:
 # Load=22/8192=0%, Rehash=0, Collisions=1/25=4%
-# Finished Make data base on Fri May 20 15:59:58 2022
+# Finished Make data base on Mon May 30 23:38:59 2022
 
  

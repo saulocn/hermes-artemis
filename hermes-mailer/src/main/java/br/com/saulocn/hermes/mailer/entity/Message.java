@@ -4,13 +4,19 @@ package br.com.saulocn.hermes.mailer.entity;
 import javax.persistence.*;
 
 @Entity
+@Table(schema = "hermes", name = "message")
 public class Message {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO, generator = "sq_message")
-    @SequenceGenerator(name = "sq_message", sequenceName = "sq_message")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "message_seq")
+    @SequenceGenerator(name = "message_seq", sequenceName = "message_seq", allocationSize = 1)
+    @Column(name = "message_id")
     private Long id;
+
+    @Column(name = "message_title")
     private String title;
+
+    @Column(name = "message_text")
     private String text;
 
     public Long getId() {
@@ -37,5 +43,4 @@ public class Message {
     public void setText(String text) {
         this.text = text;
     }
-
 }
