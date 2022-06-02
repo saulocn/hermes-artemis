@@ -28,12 +28,12 @@ public class MailSenderService {
     @Inject
     Mailer mailer;
 
+
     public void sendHtmlMail(MailVO mailVO) {
         log.info("Sending email:" + mailVO);
         mailer.send(Mail.withHtml(mailFrom, mailVO.getSubject(), mailVO.getText())
-                .addTo(mailVO.getTo())
-        );
-        log.info("sent");
+                .addTo(mailVO.getTo()));
+        log.info("Sucesso: "+ mailVO.getRecipientId());
     }
 
     public void sendAsyncHtmlMail(MailVO mailVO) {
@@ -43,7 +43,7 @@ public class MailSenderService {
                         .addTo(mailVO.getTo())
                 )
                 .subscribe().with(
-                        success -> System.out.println("Sucesso"),
+                        success -> log.info("Sucesso: "+ mailVO.getRecipientId()),
                         error -> {
                             throw new RuntimeException(error);
                         });

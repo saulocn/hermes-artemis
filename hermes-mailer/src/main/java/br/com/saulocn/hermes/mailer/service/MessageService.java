@@ -5,6 +5,9 @@ import br.com.saulocn.hermes.mailer.entity.Recipient;
 import br.com.saulocn.hermes.mailer.service.vo.MailVO;
 import br.com.saulocn.hermes.mailer.service.vo.RecipientVO;
 import io.smallrye.reactive.messaging.annotations.Blocking;
+import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
 
@@ -26,21 +29,31 @@ public class MessageService {
     @Inject
     EntityManager entityManager;
 
+    @Inject
+    @Channel("mail-requests")
+    Emitter<String> emitter;
 
     @Incoming("mail")
-    @Blocking("mail-sender-pool")
+    @Acknowledgment(Acknowledgment.Strategy.POST_PROCESSING)
+    @Blocking(value = "mail-sender-pool", ordered = false)
     @Transactional
     public void mailConsumer(String jsonMessageVO) {
         RecipientVO recipientVO = RecipientVO.fromJSON(jsonMessageVO);
         Message message = entityManager.find(Message.class, recipientVO.getMessageId());
         Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
         if(!recipient.isSent()) {
-            MailVO mailVO = new MailVO(recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
-            mailSenderService.sendAsyncHtmlMail(mailVO);
+            MailVO mailVO = new MailVO(recipientVO.getId(), recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
+            mailSenderService.sendHtmlMail(mailVO);
             recipient.setSent(true);
             entityManager.merge(recipient);
-            log.info("Sendint email: " + jsonMessageVO);
         }
     }
 
+    public void sentToMailQueue(RecipientVO recipientVO) {
+        emitter.send(recipientVO.toJSON());
+        Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
+        recipient.setProcessed(true);
+        entityManager.merge(recipient);
+        log.info("Sent to queue(fallback): "+ recipientVO.getId());
+    }
 }

@@ -1,14 +1,17 @@
 package br.com.saulocn.hermes.mailer.entity;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
 @NamedQuery(name = Recipient.FIND_NOT_PROCESSED, query = "select r from Recipient r where r.processed = false")
+@NamedQuery(name = Recipient.FIND_NOT_SENT_MINUTES, query = "select r from Recipient r where r.createdAt < :dateLimitToSend AND r.sent = false")
 @Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
     public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
+    public static final String FIND_NOT_SENT_MINUTES = "Message.FindNotSentMinutes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
@@ -27,6 +30,9 @@ public class Recipient {
 
     @Column(name = "recipient_processed")
     private boolean processed;
+
+    @Column(name = "created_on")
+    private LocalDateTime createdAt;
 
 
     public Recipient() {
@@ -81,6 +87,14 @@ public class Recipient {
         this.processed = processed;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -88,6 +102,7 @@ public class Recipient {
         Recipient recipient = (Recipient) o;
         return Objects.equals(email, recipient.email) && Objects.equals(messageId, recipient.messageId);
     }
+
 
     @Override
     public int hashCode() {

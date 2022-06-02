@@ -96,9 +96,9 @@ services:
         MQ_USERNAME: hermes
         MQ_PASSWORD: pass_hermes
         MAIL_MOCK: "true"
-        MAIL_FROM: fkmail.jd@gmail.com
-        MAIL_USERNAME: fkmail.jd@gmail.com
-        MAIL_PASSWORD: somepass
+        MAIL_FROM: jhdoefk@outlook.com
+        MAIL_USERNAME: jhdoefk@outlook.com
+        MAIL_PASSWORD: 9JTs9AHEDSUzYhz
         MAIL_SMTP: 'smtp-mail.outlook.com'
         MAIL_PORT: '587'
         MAIL_TLS: 'REQUIRED'

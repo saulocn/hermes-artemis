@@ -1,4 +1,4 @@
-package br.com.saulocn.hermes.mailer.batch;
+package br.com.saulocn.hermes.mailer.batch.enqueuer;
 
 import io.quarkus.scheduler.Scheduled;
 import org.jboss.logging.Logger;
@@ -15,14 +15,13 @@ public class MailEnqueuerJob {
     @Inject
     Logger log;
 
-    @Scheduled(every = "10s")
+    @Scheduled(every = "2m")
     public void enqueueMails(){
         JobOperator jobOperator = BatchRuntime.getJobOperator();
         Properties properties = new Properties();
         log.info("Iniciando job");
         long executionId = jobOperator.start("mail-enqueuer-chunk", properties);
-        log.info("Executando o job..." + executionId);
+        log.info("Executando o job:" + executionId);
         JobExecution jobExecution = jobOperator.getJobExecution(executionId);
-        log.info("Executando o job2..." + executionId);
     }
 }

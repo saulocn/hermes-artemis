@@ -11,3 +11,7 @@ CREATE TABLE hermes.recipient (
       FOREIGN KEY(message_id) 
 	  REFERENCES message(message_id)
 );
+
+
+CREATE INDEX recipient_idx1 
+ON hermes.recipient(recipient_sent, created_on);

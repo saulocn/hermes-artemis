@@ -1,4 +1,4 @@
-package br.com.saulocn.hermes.mailer.batch;
+package br.com.saulocn.hermes.mailer.batch.enqueuer;
 
 import br.com.saulocn.hermes.mailer.entity.Recipient;
 import org.jboss.logging.Logger;

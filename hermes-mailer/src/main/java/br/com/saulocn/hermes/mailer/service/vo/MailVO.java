@@ -3,12 +3,15 @@ package br.com.saulocn.hermes.mailer.service.vo;
 import java.util.Objects;
 
 public class MailVO {
+
+    private Long recipientId;
     private Long messageId;
     private String subject;
     private String text;
     private String to;
 
-    public MailVO(Long messageId, String subject, String text, String to) {
+    public MailVO(Long recipientId, Long messageId, String subject, String text, String to) {
+        this.recipientId=recipientId;
         this.messageId = messageId;
         this.subject = subject;
         this.text = text;
@@ -45,6 +48,14 @@ public class MailVO {
 
     public void setTo(String to) {
         this.to = to;
+    }
+
+    public Long getRecipientId() {
+        return recipientId;
+    }
+
+    public void setRecipientId(Long recipientId) {
+        this.recipientId = recipientId;
     }
 
     @Override
