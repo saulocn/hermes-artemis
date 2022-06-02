@@ -99,6 +99,10 @@ services:
         MAIL_FROM: fkmail.jd@gmail.com
         MAIL_USERNAME: fkmail.jd@gmail.com
         MAIL_PASSWORD: somepass
+        MAIL_SMTP: 'smtp-mail.outlook.com'
+        MAIL_PORT: '587'
+        MAIL_TLS: 'REQUIRED'
+        MAIL_SSL: 'false'
     restart: always
     depends_on:
         - hermes-db
