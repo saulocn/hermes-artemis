@@ -15,7 +15,7 @@ public class MailEnqueuerJob {
     @Inject
     Logger log;
 
-    @Scheduled(every = "2m")
+    @Scheduled(every = "30s")
     public void enqueueMails(){
         JobOperator jobOperator = BatchRuntime.getJobOperator();
         Properties properties = new Properties();

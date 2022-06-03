@@ -3,6 +3,7 @@ package br.com.saulocn.hermes.api.resource;
 import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 import br.com.saulocn.hermes.api.service.MessageService;
+import org.jboss.logging.Logger;
 
 import javax.inject.Inject;
 import javax.transaction.Transactional;
@@ -17,6 +18,9 @@ public class MessageResource {
     @Inject
     MessageService messageService;
 
+    @Inject
+    Logger log;
+
 
     @POST
     @Transactional
@@ -24,6 +28,7 @@ public class MessageResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response post(MessageVO messageVO) {
         Message message = messageService.sendMail(messageVO);
+        log.info("Cadastrando um e-mail para ser enviado:" + messageVO.getTitle() +" ID: " + message.getId());
         return Response.ok().entity(message).build();
     }
 

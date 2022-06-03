@@ -15,7 +15,7 @@ public class MailFallbackJob {
     @Inject
     Logger log;
 
-    @Scheduled(every = "30s")
+    @Scheduled(every = "10m")
     public void enqueueMails(){
         JobOperator jobOperator = BatchRuntime.getJobOperator();
         Properties properties = new Properties();

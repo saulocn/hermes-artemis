@@ -13,14 +13,85 @@ Cada uma dessas mensagens será processada pelo método `br.com.saulocn.hermes.m
 A fila é programada para ter 10 retentativas a cada 2 minutos:
 
 ```
-              <max-delivery-attempts>10</max-delivery-attempts>
-              <redelivery-delay>120000</redelivery-delay>
+<max-delivery-attempts>10</max-delivery-attempts>
+<redelivery-delay>120000</redelivery-delay>
 ```
 
-Referências:
+Foi implementado um job de processamento em lote para que possa reprocessar e-mails não enviados há 10 minutos na classe:
+
+```
+br.com.saulocn.hermes.mailer.batch.fallback.MailFallbackJob
+```
+
+
+## Testes
+
+Foi realizado um teste com o mock de envio de e-mail e foi possível o envio de 24435 em 24 minutos conforme os logs abaixo:
+
+```
+hermes-api_1  | 2022-06-03 02:21:23,020 
+mailer_1      | 2022-06-03 02:45:29,562 
+```
+
+## Como iniciar
+
+É possível inicializar o sistema com o docker-compose através do comando
+```
+make run-compose
+```
+Neste comando, os sistemas em java são empacotados e os containers são construídos (`build`) e após isso é executado.
+
+É possível inicializar cada um dos serviços.
+
+### PostgreSQL
+
+Para inicializar o banco de dados, basta executar o comando documentado nos Makefiles:
+
+```
+make run-db
+```
+
+### Apache Artemis MQ
+
+Para inicializar o serviço de filas, basta executar o comando documentado nos Makefiles:
+
+```
+make run-mq
+```
+
+
+### Hermes API
+
+Para inicializar o serviço da API, basta executar o comando documentado nos Makefiles:
+
+```
+make run-api
+```
+
+
+### Hermes Mailer
+
+Para inicializar o serviço de enviador de processamento em lote e enviador de e-mail, basta executar o comando documentado nos Makefiles:
+
+```
+make run-mailer
+```
+
+
+### Todos os serviços
+
+Para inicializar todos os serviços, basta executar o comando no Makefile:
+
+```
+make run-all
+```
+
+
+## Referências:
 https://quarkus.io/guides/rest-json
 https://quarkus.io/guides/datasource
 https://quarkus.io/guides/amqp
+https://smallrye.io/smallrye-reactive-messaging/smallrye-reactive-messaging/3.4/amqp/amqp.html
 https://github.com/quarkiverse/quarkus-jberet
 https://activemq.apache.org/components/artemis/documentation/latest/
 https://hub.docker.com/_/postgres

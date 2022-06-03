@@ -9,6 +9,7 @@ import org.jboss.logging.Logger;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import javax.transaction.Transactional;
 
 @ApplicationScoped
 public class MailSenderService {
@@ -29,6 +30,7 @@ public class MailSenderService {
     Mailer mailer;
 
 
+    @Transactional
     public void sendHtmlMail(MailVO mailVO) {
         log.info("Sending email:" + mailVO);
         mailer.send(Mail.withHtml(mailFrom, mailVO.getSubject(), mailVO.getText())
