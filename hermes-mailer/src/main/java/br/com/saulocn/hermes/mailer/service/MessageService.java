@@ -1,44 +1,44 @@
 package br.com.saulocn.hermes.mailer.service;
 
+import br.com.saulocn.hermes.mailer.entity.Message;
+import br.com.saulocn.hermes.mailer.entity.Recipient;
 import br.com.saulocn.hermes.mailer.service.vo.MailVO;
-import br.com.saulocn.hermes.mailer.service.vo.MessageVO;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
+import br.com.saulocn.hermes.mailer.service.vo.RecipientVO;
+import io.smallrye.reactive.messaging.annotations.Blocking;
+import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
-import org.eclipse.microprofile.reactive.messaging.OnOverflow;
+import org.jboss.logging.Logger;
 
+import javax.ejb.Stateless;
 import javax.inject.Inject;
+import javax.persistence.EntityManager;
 import javax.transaction.Transactional;
 
+@Stateless
 public class MessageService {
 
     @Inject
-    @OnOverflow(OnOverflow.Strategy.UNBOUNDED_BUFFER)
-    @Channel("mail-requests")
-    Emitter<String> emitter;
+    Logger log;
 
-    @Incoming("message-requests")
-    public void sendMails(String jsonMessageVO) {
-        var messageVO = MessageVO.fromJSON(jsonMessageVO);
-        messageVO.getRecipients().forEach(recipient -> sendMail(messageVO, recipient));
-        System.out.println(messageVO);
-    }
+    @Inject
+    MailSenderService mailSenderService;
 
-    private void sendMail(MessageVO messageVO, String recipient) {
-        var mail = MailVO.of(messageVO.getTitle(), messageVO.getText(), messageVO.getContentType(), recipient);
-        emitter.send(mail.toJSON());
-    }
 
+    @Inject
+    EntityManager entityManager;
 
     @Incoming("mail")
+    @Acknowledgment(Acknowledgment.Strategy.POST_PROCESSING)
     @Transactional
     public void mailConsumer(String jsonMessageVO) {
-        try {
-            Thread.sleep(2000);
-            System.out.println("sending email" + jsonMessageVO);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        RecipientVO recipientVO = RecipientVO.fromJSON(jsonMessageVO);
+        Message message = entityManager.find(Message.class, recipientVO.getMessageId());
+        Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
+        if(!recipient.isSent()) {
+            MailVO mailVO = new MailVO(recipientVO.getId(), recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
+            mailSenderService.sendHtmlMail(mailVO);
+            recipient.setSent(true);
+            entityManager.merge(recipient);
         }
     }
-
 }

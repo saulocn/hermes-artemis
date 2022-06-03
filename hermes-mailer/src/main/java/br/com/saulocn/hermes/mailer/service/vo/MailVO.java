@@ -1,38 +1,37 @@
 package br.com.saulocn.hermes.mailer.service.vo;
 
-import javax.json.bind.JsonbBuilder;
+import java.util.Objects;
 
 public class MailVO {
 
-    private Long id;
-    private String title;
+    private Long recipientId;
+    private Long messageId;
+    private String subject;
     private String text;
-    private String contentType;
-    private String recipient;
+    private String to;
 
-    public static MailVO of(String title, String text, String contentType, String recipient) {
-        MailVO mail = new MailVO();
-        mail.setTitle(title);
-        mail.setText(text);
-        mail.setContentType(contentType);
-        mail.setRecipient(recipient);
-        return mail;
+    public MailVO(Long recipientId, Long messageId, String subject, String text, String to) {
+        this.recipientId=recipientId;
+        this.messageId = messageId;
+        this.subject = subject;
+        this.text = text;
+        this.to = to;
     }
 
-    public Long getId() {
-        return id;
+    public Long getMessageId() {
+        return messageId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setMessageId(Long messageId) {
+        this.messageId = messageId;
     }
 
-    public String getTitle() {
-        return title;
+    public String getSubject() {
+        return subject;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public void setSubject(String subject) {
+        this.subject = subject;
     }
 
     public String getText() {
@@ -43,24 +42,42 @@ public class MailVO {
         this.text = text;
     }
 
-    public String getContentType() {
-        return contentType;
+    public String getTo() {
+        return to;
     }
 
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
+    public void setTo(String to) {
+        this.to = to;
     }
 
-    public String getRecipient() {
-        return recipient;
+    public Long getRecipientId() {
+        return recipientId;
     }
 
-    public void setRecipient(String recipient) {
-        this.recipient = recipient;
+    public void setRecipientId(Long recipientId) {
+        this.recipientId = recipientId;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MailVO mailVO = (MailVO) o;
+        return Objects.equals(messageId, mailVO.messageId) && Objects.equals(subject, mailVO.subject) && Objects.equals(text, mailVO.text) && Objects.equals(to, mailVO.to);
+    }
 
-    public String toJSON() {
-        return JsonbBuilder.create().toJson(this);
+    @Override
+    public int hashCode() {
+        return Objects.hash(messageId, subject, text, to);
+    }
+
+    @Override
+    public String toString() {
+        return "MailVO{" +
+                "messageId=" + messageId +
+                ", subject='" + subject + '\'' +
+                ", text='" + text + '\'' +
+                ", to='" + to + '\'' +
+                '}';
     }
 }

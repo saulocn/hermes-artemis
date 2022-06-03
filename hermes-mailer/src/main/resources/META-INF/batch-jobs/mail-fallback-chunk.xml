@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<job id="mailFallbackEnqueuer">
+    <step id="enqueuer-fallback-chunk">
+        <chunk checkpoint-policy="item" item-count="100">
+            <reader ref="mailFallbackReader"/>
+            <processor ref="mailFallbackProcessor"/>
+            <writer ref="mailFallbackWriter"/>
+        </chunk>
+    </step>
+</job>

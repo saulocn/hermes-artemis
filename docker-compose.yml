@@ -1,54 +1,110 @@
-version: '3'
+version: "3.3"
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    depends_on:
-      - zookeeper
+  hermes-db:
+    build:
+      context: ./db/  
+    image: saulocn/hermes-pg
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.5'
+          memory: '128M'
     ports:
-      - 9092:9092
+      - 5432:5432
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      ES_JAVA_OPTS: "-Xms512m -Xmx3000m"
-  db:
-    image: mongo
+        PGUSER: hermes
+        POSTGRES_USER: hermes
+        POSTGRES_PASSWORD: pass_hermes
+        POSTGRES_DB: hermes
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  hermes-mq:
+    build:
+      context: ./artemis/
+    image: saulocn/hermes-mq
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.5'
+          memory: '128M'
+    ports:
+      - 8161:8161
+    environment:
+        ARTEMIS_BROKER: hermes
+        ARTEMIS_USER: hermes
+        ARTEMIS_PASSWORD: pass_hermes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8161"]
+      interval: 1m30s
+      timeout: 5s
+      retries: 5
+  hermes-api:
+    build:
+      context: ./hermes-api/
+      dockerfile: ./src/main/docker/Dockerfile.jvm
+    image: saulocn/hermes-api
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1024M'
+        reservations:
+          cpus: '1'
+          memory: '512M'
+    ports:
+      - 8080:8080
+    environment:
+        JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
+        DB_USERNAME: hermes
+        DB_PASSWORD: pass_hermes
+        DB_HOST: hermes-db
+        DB_NAME: hermes
     restart: always
-    ports:
-      - 27017:27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: testdocker
-      MONGO_INITDB_DATABASE: hermes  
-  api:
-    build: ./hermes-api/
-    ports:
-      - 3000:3000
-    environment:
-        NODE_ENV: dev-compose
     depends_on:
-        db:
-            condition: service_started
-        kafka:
-            condition: service_started
+        - hermes-db
+        - hermes-mq
   mailer:
     build:
       context: ./hermes-mailer/
       dockerfile: ./src/main/docker/Dockerfile.jvm
     image: saulocn/hermes-mailer
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1024M'
+        reservations:
+          cpus: '1'
+          memory: '512M'
     environment:
         JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
+        DB_USERNAME: hermes
+        DB_PASSWORD: pass_hermes
+        DB_HOST: hermes-db
+        DB_NAME: hermes
+        MQ_HOST: hermes-mq
+        MQ_PORT: 5672
+        MQ_USERNAME: hermes
+        MQ_PASSWORD: pass_hermes
+        MAIL_MOCK: "true"
+        MAIL_FROM: somemail@outlook.com
+        MAIL_USERNAME: somemail@outlook.com
+        MAIL_PASSWORD: somepass
+        MAIL_SMTP: 'smtp-mail.outlook.com'
+        MAIL_PORT: '587'
+        MAIL_TLS: 'REQUIRED'
+        MAIL_SSL: 'false'
+    restart: always
     depends_on:
-        db:
-            condition: service_started
-        kafka:
-            condition: service_started
+        - hermes-db
+        - hermes-mq
 
