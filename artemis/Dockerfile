@@ -1,4 +1,4 @@
-FROM saulocn/artemismq:2.18.0
+FROM saulocn/artemismq:2.22.0
 
 COPY broker.xml /artemis/etc/broker.xml
 
@@ -21,5 +21,4 @@ EXPOSE 8161 \
     #STOMP
     61613
 
-
-ENTRYPOINT /artemis/artemis.sh
+CMD [ "/bin/sh", "/artemis/artemis.sh" ]
