@@ -4,7 +4,6 @@ import br.com.saulocn.hermes.mailer.entity.Message;
 import br.com.saulocn.hermes.mailer.entity.Recipient;
 import br.com.saulocn.hermes.mailer.service.vo.MailVO;
 import br.com.saulocn.hermes.mailer.service.vo.RecipientVO;
-import io.smallrye.reactive.messaging.annotations.Blocking;
 import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
@@ -34,7 +33,9 @@ public class MessageService {
         RecipientVO recipientVO = RecipientVO.fromJSON(jsonMessageVO);
         Message message = entityManager.find(Message.class, recipientVO.getMessageId());
         Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
+        log.info("Consuming: " + jsonMessageVO);
         if(!recipient.isSent()) {
+            log.info("Sending: " + jsonMessageVO);
             MailVO mailVO = new MailVO(recipientVO.getId(), recipientVO.getMessageId(), message.getTitle(), message.getText(), recipientVO.getEmail());
             mailSenderService.sendHtmlMail(mailVO);
             recipient.setSent(true);

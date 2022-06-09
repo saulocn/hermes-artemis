@@ -1,4 +1,4 @@
-package br.com.saulocn.hermes.mailer.entity;
+package br.com.saulocn.hermes.enqueuer.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
@@ -33,6 +33,7 @@ public class Recipient {
 
     @Column(name = "created_on")
     private LocalDateTime createdAt;
+
 
     public Recipient() {
     }

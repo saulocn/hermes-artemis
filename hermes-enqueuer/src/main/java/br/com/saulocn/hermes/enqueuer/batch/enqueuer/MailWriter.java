@@ -1,8 +1,7 @@
-package br.com.saulocn.hermes.mailer.batch.enqueuer;
+package br.com.saulocn.hermes.enqueuer.batch.enqueuer;
 
-import br.com.saulocn.hermes.mailer.entity.Recipient;
-import br.com.saulocn.hermes.mailer.service.MessageService;
-import br.com.saulocn.hermes.mailer.service.vo.RecipientVO;
+import br.com.saulocn.hermes.enqueuer.entity.Recipient;
+import br.com.saulocn.hermes.enqueuer.batch.vo.RecipientVO;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.jboss.logging.Logger;

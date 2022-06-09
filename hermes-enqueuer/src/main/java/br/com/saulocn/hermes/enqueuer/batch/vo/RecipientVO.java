@@ -1,4 +1,4 @@
-package br.com.saulocn.hermes.mailer.service.vo;
+package br.com.saulocn.hermes.enqueuer.batch.vo;
 
 import javax.json.bind.JsonbBuilder;
 import java.util.Objects;
@@ -8,6 +8,16 @@ public class RecipientVO {
     private Long id;
     private String email;
     private Long messageId;
+
+    public RecipientVO(Long id, String email, Long messageId) {
+        this.id = id;
+        this.email = email;
+        this.messageId = messageId;
+    }
+
+
+    public RecipientVO() {
+    }
 
     public Long getId() {
         return id;

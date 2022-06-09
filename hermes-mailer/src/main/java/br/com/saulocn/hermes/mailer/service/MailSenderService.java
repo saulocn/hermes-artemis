@@ -35,7 +35,7 @@ public class MailSenderService {
         log.info("Sending email:" + mailVO);
         mailer.send(Mail.withHtml(mailFrom, mailVO.getSubject(), mailVO.getText())
                 .addTo(mailVO.getTo()));
-        log.info("Sucesso: "+ mailVO.getRecipientId());
+        log.info("Success: "+ mailVO.getRecipientId());
     }
 
     public void sendAsyncHtmlMail(MailVO mailVO) {
@@ -45,7 +45,7 @@ public class MailSenderService {
                         .addTo(mailVO.getTo())
                 )
                 .subscribe().with(
-                        success -> log.info("Sucesso: "+ mailVO.getRecipientId()),
+                        success -> log.info("Success: "+ mailVO.getRecipientId()),
                         error -> {
                             throw new RuntimeException(error);
                         });
@@ -59,7 +59,7 @@ public class MailSenderService {
                         //.addAttachment("my-file.txt", "content of my file".getBytes(), "text/plain")
                 )
                 .subscribe().with(
-                        success -> log.info("Sucesso"),
+                        success -> log.info("Success"),
                         error -> {
                             throw new RuntimeException(error);
                         });

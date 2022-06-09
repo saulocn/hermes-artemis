@@ -1,4 +1,4 @@
-package br.com.saulocn.hermes.mailer.batch.enqueuer;
+package br.com.saulocn.hermes.enqueuer.batch.enqueuer;
 
 import io.quarkus.scheduler.Scheduled;
 import org.jboss.logging.Logger;
