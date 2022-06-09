@@ -72,6 +72,33 @@ services:
     depends_on:
         - hermes-db
         - hermes-mq
+  enqueuer:
+    build:
+      context: ./hermes-enqueuer/
+      dockerfile: ./src/main/docker/Dockerfile.jvm
+    image: saulocn/hermes-enqueuer
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1024M'
+        reservations:
+          cpus: '1'
+          memory: '512M'
+    environment:
+        JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
+        DB_USERNAME: hermes
+        DB_PASSWORD: pass_hermes
+        DB_HOST: hermes-db
+        DB_NAME: hermes
+        MQ_HOST: hermes-mq
+        MQ_PORT: 5672
+        MQ_USERNAME: hermes
+        MQ_PASSWORD: pass_hermes
+    restart: always
+    depends_on:
+        - hermes-db
+        - hermes-mq
   mailer:
     build:
       context: ./hermes-mailer/

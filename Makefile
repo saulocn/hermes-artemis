@@ -1,8 +1,13 @@
 build-mailer:
 		cd hermes-mailer && ./mvnw clean package
+
 build-api:
 		cd hermes-api && ./mvnw clean package
-build: build-mailer build-api
+
+build-enqueuer:
+		cd hermes-enqueuer && ./mvnw clean package
+
+build: build-mailer build-enqueuer build-api
 
 rm-compose: 
 		docker-compose rm -f
@@ -19,6 +24,9 @@ run-mq:
 run-api:
 		cd hermes-api && make run
 
+run-enqueuer:
+		cd hermes-enqueuer && make run
+
 run-mailer:
 		cd hermes-mailer && make run
 
@@ -31,9 +39,12 @@ rm-mq:
 rm-api:
 		cd hermes-api && make rm
 
+rm-enqueuer:
+		cd hermes-enqueuer && make rm
+
 rm-mailer:
 		cd hermes-mailer && make rm
 
-rm-all: rm-mailer rm-api rm-db rm-mq
+rm-all: rm-mailer rm-enqueuer rm-api rm-db rm-mq
 
-run-all: rm-all run-db run-mq run-mailer run-api
+run-all: rm-all run-db run-mq run-mailer run-enqueuer run-api

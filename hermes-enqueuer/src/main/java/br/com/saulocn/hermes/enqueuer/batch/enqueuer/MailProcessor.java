@@ -1,6 +1,6 @@
-package br.com.saulocn.hermes.mailer.batch.fallback;
+package br.com.saulocn.hermes.enqueuer.batch.enqueuer;
 
-import br.com.saulocn.hermes.mailer.entity.Recipient;
+import br.com.saulocn.hermes.enqueuer.entity.Recipient;
 import org.jboss.logging.Logger;
 
 import javax.batch.api.chunk.ItemProcessor;
@@ -11,7 +11,7 @@ import javax.inject.Named;
 
 @Dependent
 @Named
-public class MailFallbackProcessor implements ItemProcessor {
+public class MailProcessor implements ItemProcessor {
 
     @Inject
     Logger log;
@@ -19,7 +19,7 @@ public class MailFallbackProcessor implements ItemProcessor {
     @Override
     public Object processItem(Object o) throws Exception {
         Recipient recipient = (Recipient) o;
-        log.info("Processing fallback: " + recipient.getId());
+        log.info("Processing " + recipient.getId());
         return recipient;
     }
 }
