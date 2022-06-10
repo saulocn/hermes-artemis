@@ -2,7 +2,7 @@
 POST http://localhost:8080/message
 
 ###
-GET http://localhost:8080/message
+GET http://localhost:8080/message/1
 
 ###
 POST http://localhost:8080/message
