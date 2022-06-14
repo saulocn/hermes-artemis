@@ -18,6 +18,7 @@ import java.util.List;
 @ApplicationScoped
 public class MessageService {
 
+    private static final String TTL_IN_SECONDS = "30";
     @Inject
     EntityManager em;
 
@@ -33,9 +34,16 @@ public class MessageService {
     public Message sendMail(MessageVO messageVO){
         Message message = Message.of(messageVO);
         em.persist(message);
+        messageVO.setId(message.getId());
         messageVO.getRecipients().stream().forEach(recipient -> em.persist(new Recipient(recipient, message.getId())));
-        redisClient.set(Arrays.asList(getMessageKey(message.getId()), MailVO.of(messageVO).toJSON()));
+        setToCache(MailVO.of(messageVO));
         return message;
+    }
+
+    private void setToCache(MailVO mailVO) {
+        String cacheKey = getMessageKey(mailVO.getMessageId());
+        redisClient.set(Arrays.asList(cacheKey, mailVO.toJSON()));
+        redisClient.expire(cacheKey, TTL_IN_SECONDS);
     }
 
     private String getMessageKey(Long messageId) {
@@ -47,8 +55,25 @@ public class MessageService {
     }
 
     public MailVO findById(Long messageId) {
-        String mailVOJSON = redisClient.get(getMessageKey(messageId)).toString();
-        log.info("Found: "+mailVOJSON);
+        MailVO mailVO = findInCache(messageId);
+        if(mailVO==null){
+            Message message = em.find(Message.class, messageId);
+            mailVO = MailVO.fromMessage(message);
+            setToCache(mailVO);
+            log.info("Found in DB: Message "+mailVO.getMessageId());
+            return mailVO;
+        } else {
+            log.info("Found in cache: Message "+mailVO.getMessageId());
+            return mailVO;
+        }
+    }
+
+    private MailVO findInCache(Long messageId) {
+        Response response = redisClient.get(getMessageKey(messageId));
+        if(response==null){
+            return null;
+        }
+        String mailVOJSON = response.toString();
         return MailVO.fromJSON(mailVOJSON);
     }
 }

@@ -1,5 +1,8 @@
 package br.com.saulocn.hermes.mailer.service.vo;
 
+import br.com.saulocn.hermes.mailer.entity.Message;
+
+import javax.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class MailVO {
@@ -9,6 +12,7 @@ public class MailVO {
     private String subject;
     private String text;
     private String to;
+    private String contentType;
 
     public MailVO(Long recipientId, Long messageId, String subject, String text, String to) {
         this.recipientId=recipientId;
@@ -16,6 +20,17 @@ public class MailVO {
         this.subject = subject;
         this.text = text;
         this.to = to;
+    }
+
+    public MailVO() {}
+
+    public static MailVO fromMessage(Message message) {
+        MailVO mailVO = new MailVO();
+        mailVO.setMessageId(message.getId());
+        mailVO.setText(message.getText());
+        mailVO.setSubject(message.getTitle());
+        mailVO.setContentType(message.getContentType());
+        return mailVO;
     }
 
     public Long getMessageId() {
@@ -56,6 +71,22 @@ public class MailVO {
 
     public void setRecipientId(Long recipientId) {
         this.recipientId = recipientId;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public String toJSON() {
+        return JsonbBuilder.create().toJson(this);
+    }
+
+    public static MailVO fromJSON(String json) {
+        return JsonbBuilder.create().fromJson(json, MailVO.class);
     }
 
     @Override

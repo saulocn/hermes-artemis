@@ -1,5 +1,6 @@
 package br.com.saulocn.hermes.api.service.vo;
 
+import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
 import javax.json.bind.JsonbBuilder;
@@ -21,6 +22,15 @@ public class MailVO {
         mailVO.setText(messageVO.getText());
         mailVO.setSubject(messageVO.getTitle());
         mailVO.setContentType(messageVO.getContentType());
+        return mailVO;
+    }
+
+    public static MailVO fromMessage(Message message) {
+        MailVO mailVO = new MailVO();
+        mailVO.setMessageId(message.getId());
+        mailVO.setText(message.getText());
+        mailVO.setSubject(message.getTitle());
+        mailVO.setContentType(message.getContentType());
         return mailVO;
     }
 

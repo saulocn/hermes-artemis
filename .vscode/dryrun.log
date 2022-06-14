@@ -1,3 +1,5 @@
-
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/saulo/workspace/hermes-artemis'
 cd hermes-mailer && ./mvnw clean package
 make: Leaving directory '/home/saulo/workspace/hermes-artemis'
+ 

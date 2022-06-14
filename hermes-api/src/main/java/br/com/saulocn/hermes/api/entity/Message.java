@@ -24,11 +24,15 @@ public class Message {
     @Column(name = "message_text")
     private String text;
 
+    @Column(name = "content_type")
+    private String contentType;
+
 
     public static Message of(MessageVO messageVO) {
         Message message = new Message();
         message.setText(messageVO.getText());
         message.setTitle(messageVO.getTitle());
+        message.setContentType(messageVO.getContentType());
         return message;
     }
 
@@ -57,4 +61,11 @@ public class Message {
         this.text = text;
     }
 
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
 }

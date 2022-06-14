@@ -6,7 +6,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Thu Jun  9 17:02:26 2022
+# Make data base, printed on Tue Jun 14 12:15:55 2022
 
 # Variables
 
@@ -43,13 +43,13 @@ CURDIR := /home/saulo/workspace/hermes-artemis
 # makefile
 SHELL = /bin/sh
 # environment
-SNAP_DATA = /var/snap/code/97
+SNAP_DATA = /var/snap/code/98
 # environment
 GDM_LANG = pt_BR
 # environment
 VSCODE_NLS_CONFIG = {"locale":"pt-br","availableLanguages":{},"_languagePackSupport":true}
 # environment
-_ = /snap/code/97/usr/share/code/code
+_ = /snap/code/98/usr/share/code/code
 # environment
 XDG_CONFIG_DIRS = /etc/xdg/xdg-cinnamon:/etc/xdg
 # environment
@@ -77,13 +77,13 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-b3601720-5f43-4c35-8a2a-04cd28affaef.sock
+VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-ca15c0eb-ec2b-4a9b-9ebf-9c039f12f47a.sock
 # environment
 VSCODE_CWD = /home/saulo
 # environment
 XDG_SESSION_PATH = /org/freedesktop/DisplayManager/Session0
 # environment
-GSETTINGS_SCHEMA_DIR = /snap/code/97/usr/share/glib-2.0/schemas
+GSETTINGS_SCHEMA_DIR = /snap/code/98/usr/share/glib-2.0/schemas
 # default
 MAKE_HOST := x86_64-pc-linux-gnu
 # environment
@@ -93,15 +93,15 @@ GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
 # environment
 LSCOLORS = Gxfxcxdxbxegedabagacad
 # environment
-SESSION_MANAGER = local/saulo-550XDA:@/tmp/.ICE-unix/2101,unix/saulo-550XDA:/tmp/.ICE-unix/2101
+SESSION_MANAGER = local/saulo-550XDA:@/tmp/.ICE-unix/1979,unix/saulo-550XDA:/tmp/.ICE-unix/1979
 # environment
 XDG_RUNTIME_DIR = /run/user/1000
 # environment
 GDK_PIXBUF_MODULE_FILE = /home/saulo/snap/code/common/.cache/gdk-pixbuf-loaders.cache
 # environment
-SNAP = /snap/code/97
+SNAP = /snap/code/98
 # environment
-SNAP_VERSION = c3511e6c
+SNAP_VERSION = 4af164ea
 # environment
 VSCODE_LOG_STACK = false
 # environment
@@ -109,7 +109,7 @@ DISABLE_WAYLAND = 1
 # environment
 ELECTRON_RUN_AS_NODE = 1
 # environment
-GDK_PIXBUF_MODULEDIR = /snap/code/97/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders
+GDK_PIXBUF_MODULEDIR = /snap/code/98/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders
 # default
 .FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
 # environment
@@ -123,7 +123,7 @@ XDG_SESSION_DESKTOP = cinnamon
 # environment
 SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
 # environment
-GIO_LAUNCHED_DESKTOP_FILE_PID = 67764
+GIO_LAUNCHED_DESKTOP_FILE_PID = 42451
 # automatic
 %F = $(notdir $%)
 # environment
@@ -141,7 +141,7 @@ QT_QPA_PLATFORMTHEME = qt5ct
 # environment
 XDG_SEAT = seat0
 # environment
-SSH_AGENT_PID = 2174
+SSH_AGENT_PID = 2052
 # environment
 ORIGINAL_XDG_CURRENT_DESKTOP = X-Cinnamon
 # environment
@@ -153,7 +153,7 @@ HOME = /home/saulo
 # environment
 VSCODE_CLI = 1
 # environment
-VSCODE_CODE_CACHE_PATH = /home/saulo/.config/Code/CachedData/c3511e6c69bb39013c4a4b7b9566ec1ca73fc4d5
+VSCODE_CODE_CACHE_PATH = /home/saulo/.config/Code/CachedData/4af164ea3a06f701fe3e89a2bcbb421d2026b68f
 # environment
 LOGNAME = saulo
 # environment
@@ -183,7 +183,7 @@ MAKE = $(MAKE_COMMAND)
 # default
 MAKECMDGOALS := all
 # environment
-SNAP_USER_DATA = /home/saulo/snap/code/97
+SNAP_USER_DATA = /home/saulo/snap/code/98
 # environment
 SHLVL = 0
 # environment
@@ -191,7 +191,7 @@ XDG_SESSION_ID = c2
 # environment
 USER = saulo
 # environment
-SNAP_REVISION = 97
+SNAP_REVISION = 98
 # makefile
 .DEFAULT_GOAL := build-mailer
 # environment
@@ -213,7 +213,7 @@ LANGUAGE = pt_BR:pt:en
 # environment
 XDG_SEAT_PATH = /org/freedesktop/DisplayManager/Seat0
 # environment
-VSCODE_IPC_HOOK = /run/user/1000/vscode-92d723e8-1.67.2-main.sock
+VSCODE_IPC_HOOK = /run/user/1000/vscode-92d723e8-1.68.0-main.sock
 # environment
 BAMF_DESKTOP_FILE_HINT = /var/lib/snapd/desktop/applications/code_code.desktop
 # makefile
@@ -265,7 +265,7 @@ GJS_DEBUG_OUTPUT = stderr
 # environment
 LANG = C
 # environment
-VSCODE_PID = 67812
+VSCODE_PID = 42499
 # variable set hash-table stats:
 # Load=128/1024=12%, Rehash=0, Collisions=12/153=8%
 
@@ -279,20 +279,20 @@ VSCODE_PID = 67812
 
 # 17 files, no impossibilities in 1 directories.
 
+ 
+make: *** No rule to make target 'all'.  Stop.
+
 # Implicit Rules
 
 # No implicit rules.
 
 # Files
- 
-make: *** No rule to make target 'all'.  Stop.
-
 
 rm-compose:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 8):
+#  recipe to execute (from 'Makefile', line 13):
 		docker-compose rm -f
 
 # Not a target:
@@ -302,21 +302,28 @@ all:
 #  File does not exist.
 #  File has not been updated.
 
+rm-enqueuer:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 43):
+		cd hermes-enqueuer && make rm
+
 run-mailer:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 23):
+#  recipe to execute (from 'Makefile', line 31):
 		cd hermes-mailer && make run
 
 rm-db:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 26):
+#  recipe to execute (from 'Makefile', line 34):
 		cd db && make rm
 
-rm-all: rm-mailer rm-api rm-db rm-mq
+rm-all: rm-mailer rm-enqueuer rm-api rm-db rm-mq
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -324,7 +331,7 @@ rm-all: rm-mailer rm-api rm-db rm-mq
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-03 00:27:38.87260897
+#  Last modified 2022-06-09 17:15:14.215181689
 #  File has been updated.
 #  Successfully updated.
 
@@ -332,33 +339,40 @@ rm-api:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 32):
+#  recipe to execute (from 'Makefile', line 40):
 		cd hermes-api && make rm
 
 rm-mq:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 29):
+#  recipe to execute (from 'Makefile', line 37):
 		cd artemis && make rm
 
-build: build-mailer build-api
+build: build-mailer build-enqueuer build-api
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
+
+build-enqueuer:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 8):
+		cd hermes-enqueuer && ./mvnw clean package
 
 build-api:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 4):
+#  recipe to execute (from 'Makefile', line 5):
 		cd hermes-api && ./mvnw clean package
 
 run-compose: rm-compose build
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 11):
+#  recipe to execute (from 'Makefile', line 16):
 		docker-compose up --build
 
 # Not a target:
@@ -367,14 +381,21 @@ run-compose: rm-compose build
 #  Modification time never checked.
 #  File has not been updated.
 
+run-enqueuer:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  recipe to execute (from 'Makefile', line 28):
+		cd hermes-enqueuer && make run
+
 run-db:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 14):
+#  recipe to execute (from 'Makefile', line 19):
 		cd db && make run
 
-run-all: rm-all run-db run-mq run-mailer run-api
+run-all: rm-all run-db run-mq run-mailer run-enqueuer run-api
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -390,37 +411,37 @@ run-api:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 20):
+#  recipe to execute (from 'Makefile', line 25):
 		cd hermes-api && make run
 
 run-mq:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 17):
+#  recipe to execute (from 'Makefile', line 22):
 		cd artemis && make run
 
 rm-mailer:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
-#  recipe to execute (from 'Makefile', line 35):
+#  recipe to execute (from 'Makefile', line 46):
 		cd hermes-mailer && make rm
 
 # files hash-table stats:
-# Load=19/1024=2%, Rehash=0, Collisions=3/42=7%
+# Load=22/1024=2%, Rehash=0, Collisions=3/48=6%
 # VPATH Search Paths
 
 # No 'vpath' search paths.
 
 # No general ('VPATH' variable) search path.
 
-# strcache buffers: 1 (0) / strings = 37 / storage = 349 B / avg = 9 B
-# current buf: size = 8162 B / used = 349 B / count = 37 / avg = 9 B
+# strcache buffers: 1 (0) / strings = 40 / storage = 389 B / avg = 9 B
+# current buf: size = 8162 B / used = 389 B / count = 40 / avg = 9 B
 
-# strcache performance: lookups = 69 / hit rate = 46%
+# strcache performance: lookups = 78 / hit rate = 48%
 # hash-table stats:
-# Load=37/8192=0%, Rehash=0, Collisions=1/69=1%
-# Finished Make data base on Thu Jun  9 17:02:26 2022
+# Load=40/8192=0%, Rehash=0, Collisions=1/78=1%
+# Finished Make data base on Tue Jun 14 12:15:55 2022
 
  

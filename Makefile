@@ -18,6 +18,9 @@ run-compose: rm-compose build
 run-db:
 		cd db && make run
 
+run-cache:
+		cd cache && make run
+
 run-mq:
 		cd artemis && make run
 
@@ -33,6 +36,9 @@ run-mailer:
 rm-db:
 		cd db && make rm
 
+rm-cache:
+		cd cache && make rm
+
 rm-mq:
 		cd artemis && make rm
 
@@ -45,6 +51,6 @@ rm-enqueuer:
 rm-mailer:
 		cd hermes-mailer && make rm
 
-rm-all: rm-mailer rm-enqueuer rm-api rm-db rm-mq
+rm-all: rm-mailer rm-enqueuer rm-api rm-db rm-mq rm-cache
 
-run-all: rm-all run-db run-mq run-mailer run-enqueuer run-api
+run-all: rm-all run-db run-mq run-cache run-mailer run-enqueuer run-api
