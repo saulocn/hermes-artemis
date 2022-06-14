@@ -19,6 +19,10 @@ public class Message {
     @Column(name = "message_text")
     private String text;
 
+    @Column(name = "content_type")
+    private String contentType;
+
+
     public Long getId() {
         return id;
     }
@@ -42,5 +46,13 @@ public class Message {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
     }
 }
