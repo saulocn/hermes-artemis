@@ -1,11 +1,14 @@
 package br.com.saulocn.hermes.api.entity;
 
+import io.quarkus.hibernate.reactive.panache.PanacheEntity;
+import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
+
 import javax.persistence.*;
 import java.util.Objects;
 
 @Entity
 @Table(schema = "hermes", name = "recipient")
-public class Recipient {
+public class Recipient extends PanacheEntityBase {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
