@@ -4,16 +4,18 @@ import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.entity.Recipient;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 import br.com.saulocn.hermes.api.service.vo.MailVO;
-import io.quarkus.hibernate.reactive.panache.Panache;
+import io.quarkus.hibernate.reactive.panache.common.runtime.ReactiveTransactional;
 import io.quarkus.redis.client.reactive.ReactiveRedisClient;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.subscription.Cancellable;
 import io.vertx.mutiny.redis.client.Response;
 import org.jboss.logging.Logger;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.transaction.Transactional;
 import java.util.List;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class MessageService {
@@ -28,16 +30,18 @@ public class MessageService {
     Logger log;
 
 
-    @Transactional
+    @ReactiveTransactional
     public Uni<Message> sendMail(MessageVO messageVO){
         Message message = Message.of(messageVO);
-        Uni<Message> persistedMessage = Panache.withTransaction(message::persist);
-        persistRecipients(messageVO.getRecipients(), message.getId());
-        return persistedMessage;
-    }
-
-    private void persistRecipients(List<String> recipients, Long messageId){
-        recipients.forEach(recipient -> Panache.withTransaction(new Recipient(recipient, messageId)::persist));
+        Uni<Message> persist = message.persist();
+        persist.chain()
+        persist.subscribeAsCompletionStage(item->{
+            log.info("Pelo menos executou?");
+            Stream<Recipient> recipientStream = messageVO.getRecipients().stream()
+                    .map(recipientRequested -> new Recipient(recipientRequested, item.getId()));
+            return Multi.createFrom().items(recipientStream).onItem().invoke(recipient->recipient.persist()).toUni();
+        });
+        return persist;
     }
 
 

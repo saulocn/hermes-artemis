@@ -1,6 +1,5 @@
 package br.com.saulocn.hermes.api.entity;
 
-import io.quarkus.hibernate.reactive.panache.PanacheEntity;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 
 import javax.persistence.*;

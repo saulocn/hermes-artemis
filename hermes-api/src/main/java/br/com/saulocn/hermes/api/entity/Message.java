@@ -2,13 +2,9 @@ package br.com.saulocn.hermes.api.entity;
 
 
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
-import io.quarkus.hibernate.reactive.panache.PanacheEntity;
 import io.quarkus.hibernate.reactive.panache.PanacheEntityBase;
 
 import javax.persistence.*;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(schema = "hermes", name = "message")

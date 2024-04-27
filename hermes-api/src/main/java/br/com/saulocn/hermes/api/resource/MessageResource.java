@@ -2,6 +2,7 @@ package br.com.saulocn.hermes.api.resource;
 
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 import br.com.saulocn.hermes.api.service.MessageService;
+import io.quarkus.hibernate.reactive.panache.common.runtime.ReactiveTransactional;
 import io.smallrye.mutiny.Uni;
 import org.jboss.logging.Logger;
 
@@ -24,7 +25,7 @@ public class MessageResource {
 
 
     @POST
-    @Transactional
+    @ReactiveTransactional
     public Uni<Response> post(MessageVO messageVO) {
         log.info("Cadastrando");
         return messageService.sendMail(messageVO)
