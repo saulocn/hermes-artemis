@@ -1,6 +1,6 @@
 package br.com.saulocn.hermes.enqueuer.batch.vo;
 
-import javax.json.bind.JsonbBuilder;
+import jakarta.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class RecipientVO {

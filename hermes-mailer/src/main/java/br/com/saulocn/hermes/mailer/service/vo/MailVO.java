@@ -2,7 +2,7 @@ package br.com.saulocn.hermes.mailer.service.vo;
 
 import br.com.saulocn.hermes.mailer.entity.Message;
 
-import javax.json.bind.JsonbBuilder;
+import jakarta.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class MailVO {

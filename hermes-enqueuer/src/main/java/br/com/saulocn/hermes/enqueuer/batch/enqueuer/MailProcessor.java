@@ -3,10 +3,10 @@ package br.com.saulocn.hermes.enqueuer.batch.enqueuer;
 import br.com.saulocn.hermes.enqueuer.entity.Recipient;
 import org.jboss.logging.Logger;
 
-import javax.batch.api.chunk.ItemProcessor;
-import javax.enterprise.context.Dependent;
-import javax.inject.Inject;
-import javax.inject.Named;
+import jakarta.batch.api.chunk.ItemProcessor;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 
 @Dependent

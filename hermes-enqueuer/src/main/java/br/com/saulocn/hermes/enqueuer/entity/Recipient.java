@@ -1,6 +1,6 @@
 package br.com.saulocn.hermes.enqueuer.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 

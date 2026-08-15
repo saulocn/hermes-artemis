@@ -3,7 +3,7 @@ package br.com.saulocn.hermes.api.service.vo;
 import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
-import javax.json.bind.JsonbBuilder;
+import jakarta.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class MailVO {

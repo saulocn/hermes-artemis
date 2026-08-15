@@ -1,7 +1,7 @@
 package br.com.saulocn.hermes.enqueuer.entity;
 
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(schema = "hermes", name = "message")
