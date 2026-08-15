@@ -1,6 +1,6 @@
-CONTAINER_NAME=hermes-artemis
-IMAGE_NAME=hermes-artemis
-NETWORK_MODE= 
+CONTAINER_NAME=hermes-rabbit
+IMAGE_NAME=hermes-rabbit
+NETWORK_MODE=
 
 # Rede própria em vez de --network host: a bridge default não resolve nome de container,
 # e no Docker Desktop (macOS) o host network fica na VM, invisível para o host e para os
@@ -13,6 +13,6 @@ net:
 build:
 	docker build -t ${IMAGE_NAME} .
 run: build rm net
-	docker run -d --network ${NETWORK} --memory="512m" --cpus="1" -p 8161:8161 -p 61616:61616 -p 5672:5672 --name  ${CONTAINER_NAME} ${IMAGE_NAME}
+	docker run -d --network ${NETWORK} --memory="512m" --cpus="1" -p 5672:5672 -p 15672:15672 --name  ${CONTAINER_NAME} ${IMAGE_NAME}
 rm:
 	docker rm -f ${CONTAINER_NAME} || true
