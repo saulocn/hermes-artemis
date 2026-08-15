@@ -10,13 +10,20 @@ import jakarta.transaction.Transactional;
 /**
  * Records that a delivery was attempted and did not stick.
  *
- * <p>This exists in its own transaction for one reason: the consumer's transaction is what rolls
+ * <p>This exists in its own transaction for one reason: the delivery transaction is what rolls
  * back when a send fails, and it would take the counter with it. Writing the attempt in a
  * separate transaction is what makes the failure outlive the rollback that hides it.
  *
  * <p>Without this, a recipient whose send keeps throwing is indistinguishable from one waiting in
  * the queue — both read {@code processed = true, sent = false} — so the dashboard counted a
  * permanently failing message as "in flight" forever.
+ *
+ * <p><strong>Call this only when no transaction of your own holds the recipient row.</strong> The
+ * delivery transaction locks that row from the claim until commit; a second transaction updating
+ * it from the same thread waits for a lock only that thread can release, and unwinds through the
+ * transaction timeout rather than a deadlock error, because one side of the cycle is application
+ * code the database cannot see. {@link MailConsumer} is the caller for exactly that reason: it
+ * runs outside the delivery transaction.
  *
  * <p>Counting here rather than reading the broker's own redelivery count is deliberate: reaching
  * that metadata means consuming a {@code Message<String>}, and SmallRye then requires the

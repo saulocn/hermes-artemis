@@ -41,4 +41,10 @@ public class MailFixtures {
         Recipient recipient = entityManager.find(Recipient.class, recipientId);
         return recipient != null && recipient.isSent();
     }
+
+    @Transactional
+    public int attemptsOf(Long recipientId) {
+        Recipient recipient = entityManager.find(Recipient.class, recipientId);
+        return recipient == null ? -1 : recipient.getAttempts();
+    }
 }

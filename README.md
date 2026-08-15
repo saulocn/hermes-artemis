@@ -46,9 +46,11 @@ O estado de cada destinatário vive em dois booleanos na tabela `hermes.recipien
 | Em trânsito | `true` | `false` | Publicado, aguardando consumo |
 | Entregue | `true` | `true` | E-mail enviado |
 
-Há um quarto, que é um subconjunto de "em trânsito": **falhando**, quando `recipient_attempts > 0`. Um envio que lança faz rollback do claim e a linha volta a `processed=true, sent=false` — exatamente o que uma mensagem só aguardando na fila parece. Sem o contador, uma mensagem presa em retentativa e uma apenas enfileirada eram o mesmo número no painel, para sempre. O contador é gravado em transação própria, porque o rollback que devolve a mensagem à fila desfaria qualquer coisa escrita na transação do consumo.
+Há um quarto, que é um subconjunto de "em trânsito": **falhando**, quando `recipient_attempts > 0`. Um envio que lança faz rollback do claim e a linha volta a `processed=true, sent=false` — exatamente o que uma mensagem só aguardando na fila parece. Sem o contador, uma mensagem presa em retentativa e uma apenas enfileirada eram o mesmo número no painel, para sempre.
 
-**Fluxo.** `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MessageService#mailConsumer` consome, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
+O contador é gravado em transação própria, porque o rollback que devolve a mensagem à fila desfaria qualquer coisa escrita na transação da entrega — e **fora** dela, depois que o rollback já soltou o lock da linha. Uma transação nova atualizando a linha que a transação suspensa ainda trava espera por um lock que só a própria thread pode liberar; o Postgres não vê ciclo, porque um dos lados é código de aplicação. É por isso que o consumidor (`MailConsumer`) e a entrega (`MessageService#deliver`) são módulos separados: a ordem "entrega commita ou aborta, depois conta" é o que essa separação expressa.
+
+**Fluxo.** `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MailConsumer#consume` tira da fila, `MessageService#deliver` reivindica a linha, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
 
 **Rede de segurança.** `MailFallbackJob` roda a cada 10 minutos e republica o que continua `sent = false` há mais de 10 minutos. Isso recupera qualquer coisa que se perca entre a publicação e a entrega, ao custo de gerar duplicatas quando o consumo está atrasado — por isso o consumo é idempotente (ver "O que foi corrigido").
 
@@ -149,8 +151,11 @@ Classes `*IT` rodam no failsafe (`mvn verify`) porque precisam de Docker; `mvn t
 | `MailEnqueuerJobIT` | pump DB→fila: publica os não processados e marca `recipient_processed` |
 | `MailFallbackJobIT` | rede de segurança: republica só o que está fora da janela de 10 minutos |
 | `MailWriterAckIT` | invariante central: com o broker recusando a publicação, nenhum destinatário é marcado como processado |
+| `DeliveryFailureIT` | um envio que lança conta a tentativa **e** devolve o claim — sem esperar o timeout de transação |
 
 Os dois ITs de broker herdam de `AbstractMailConsumerIT` e sobem o container com o **mesmo** `artemis/broker.xml` / `rabbit/definitions.json` que o compose usa — é isso que trava a paridade de comportamento entre os brokers. Os testes de batch usam o connector in-memory do SmallRye e não precisam de broker.
+
+O `DeliveryFailureIT` também usa o connector in-memory: o que ele verifica é a ordem entre a transação de entrega e o contador de falha, e AMQP não participa disso. O banco é real, porque o lock de linha é justamente o assunto. O orçamento de 10s do teste não é medida de performance — contar a falha de dentro da transação de entrega leva no mínimo os 30s do timeout configurado, então nenhuma máquina rápida faz esse teste passar por acaso.
 
 ## Inicializando serviços individualmente
 

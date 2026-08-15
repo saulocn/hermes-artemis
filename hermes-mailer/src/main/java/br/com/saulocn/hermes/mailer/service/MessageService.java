@@ -4,17 +4,16 @@ import br.com.saulocn.hermes.mailer.entity.Message;
 import br.com.saulocn.hermes.mailer.service.vo.MailVO;
 import br.com.saulocn.hermes.mailer.service.vo.RecipientVO;
 import io.quarkus.redis.client.RedisClient;
-import io.smallrye.reactive.messaging.annotations.Blocking;
 import io.vertx.redis.client.Response;
-import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
-import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.jboss.logging.Logger;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import java.util.Arrays;
 
+@ApplicationScoped
 public class MessageService {
 
     private static final String TTL_IN_SECONDS = "30";
@@ -31,19 +30,16 @@ public class MessageService {
     @Inject
     EntityManager entityManager;
 
-    @Inject
-    DeliveryAttempts deliveryAttempts;
-
-    // JDBC and the SMTP client both block, so this must not run on the event loop. The named
-    // pool is what smallrye.messaging.worker.mail-sender-pool.max-concurrency sizes — that
-    // property was configured but had nothing referencing it until now.
-    @Incoming("mail")
-    @Blocking("mail-sender-pool")
-    @Acknowledgment(Acknowledgment.Strategy.POST_PROCESSING)
+    /**
+     * Claims the recipient and sends the mail, as one transaction.
+     *
+     * <p>Everything this touches rolls back together when the send throws, which is what puts the
+     * message back on the queue. Nothing that must <em>survive</em> that rollback belongs in
+     * here — see {@link MailConsumer} for where the failure counter goes and why.
+     */
     @Transactional
-    public void mailConsumer(String jsonMessageVO) {
-        RecipientVO recipientVO = RecipientVO.fromJSON(jsonMessageVO);
-        log.info("Consuming: " + jsonMessageVO);
+    public void deliver(RecipientVO recipientVO) {
+        log.info("Consuming: " + recipientVO.getId());
 
         // Claim the recipient before sending, with the check and the write in one statement.
         // Reading `sent` and then updating it leaves a window: MailFallbackJob republishes
@@ -66,20 +62,13 @@ public class MessageService {
             return;
         }
 
-        log.info("Sending: " + jsonMessageVO);
+        log.info("Sending: " + recipientVO.getId());
         MailVO mailVO = findById(recipientVO.getMessageId());
         mailVO.setTo(recipientVO.getEmail());
         mailVO.setRecipientId(recipientVO.getId());
 
-        try {
-            mailSenderService.sendHtmlMail(mailVO);
-        } catch (RuntimeException e) {
-            // Count the failure before letting it propagate. Rethrowing rolls this transaction
-            // back — including the claim above, which is what puts the message back on the queue
-            // — so the counter has to be written somewhere that rollback cannot reach.
-            deliveryAttempts.recordFailure(recipientVO.getId(), e);
-            throw e;
-        }
+        // Throwing from here rolls the claim back with the transaction, so the broker redelivers.
+        mailSenderService.sendHtmlMail(mailVO);
     }
 
 
