@@ -23,7 +23,6 @@ public class BatchTestProfile implements QuarkusTestProfile {
         Map<String, String> config = new HashMap<>();
 
         config.putAll(InMemoryConnector.switchOutgoingChannelsToInMemory("mail-requests"));
-        config.putAll(InMemoryConnector.switchOutgoingChannelsToInMemory("mail-fallback-request"));
 
         config.put("quarkus.datasource.db-kind", "postgresql");
         config.put("quarkus.hibernate-orm.database.default-schema", "hermes");

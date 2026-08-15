@@ -40,7 +40,8 @@ class MailFallbackJobIT {
 
     @BeforeEach
     void resetSink() {
-        sink = connector.sink("mail-fallback-request");
+        // Both jobs publish on the same channel now; they always shared the address.
+        sink = connector.sink("mail-requests");
         sink.clear();
     }
 

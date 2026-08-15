@@ -3,7 +3,7 @@
     <step id="enqueuer-fallback-chunk">
         <chunk checkpoint-policy="item" item-count="100">
             <reader ref="mailFallbackReader"/>
-            <writer ref="mailFallbackWriter"/>
+            <writer ref="mailWriter"/>
         </chunk>
     </step>
 </job>

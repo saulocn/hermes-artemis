@@ -13,32 +13,34 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * The invariant this pins down: a recipient is never flagged {@code processed} unless the broker
- * actually accepted its message.
+ * The invariant: a recipient is never flagged {@code processed} unless the broker took its
+ * message.
  *
- * <p>Breaking that invariant is what produced the orphan rows measured under load
- * ({@code processed=true, sent=false}) — see the "Capacidade" section of the README. The broker
- * here refuses every publish, so after the job runs nothing may be marked.
+ * <p>Breaking it is what produced the orphan rows measured under load ({@code processed=true,
+ * sent=false}) — see the "Capacidade" section of the README.
+ *
+ * <p>The refusal comes from a swapped RecipientPublisher, not from a broker. This used to need a
+ * whole RabbitMQ container aimed at a queue that did not exist, because the emitter was injected
+ * straight into the writer and there was nowhere to substitute.
  */
 @QuarkusTest
-@TestProfile(BrokerAckTestProfile.class)
+@TestProfile(AckFailureTestProfile.class)
 @WithTestResource(PostgresTestResource.class)
-@WithTestResource(RejectingBrokerTestResource.class)
 class MailWriterAckIT {
 
     @Inject
     BatchFixtures fixtures;
 
     @Test
-    void doesNotFlagProcessedWhenBrokerRefusesThePublish() {
+    void doesNotFlagProcessedWhenTheBrokerRefusesThePublish() {
         Message message = fixtures.createMessage();
         List<Long> ids = fixtures.createRecipients(message.getId(), 3, false, false, LocalDateTime.now());
 
-        // The job is expected to fail here — the broker refuses. What matters is the DB state
-        // it leaves behind, so the terminal status itself is not asserted.
+        // Expected to fail — what matters is the state it leaves behind, so the terminal status
+        // itself is not asserted.
         BatchJobs.runToTerminalStatus("mail-enqueuer-chunk");
 
         ids.forEach(id -> assertFalse(fixtures.isProcessed(id),
-                "recipient " + id + " was flagged processed even though the broker refused the message"));
+                "recipient " + id + " was flagged processed even though the broker refused it"));
     }
 }
