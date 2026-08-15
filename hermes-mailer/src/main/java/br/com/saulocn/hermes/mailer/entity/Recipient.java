@@ -32,7 +32,7 @@ public class Recipient {
     @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
     private int attempts;
 
-    @Column(name = "created_on")
+    @Column(name = "created_on", columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
     public Recipient() {

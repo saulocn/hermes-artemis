@@ -31,7 +31,22 @@ public class Recipient {
     @Column(name = "recipient_processed")
     private boolean processed;
 
-    @Column(name = "created_on")
+    /**
+     * Written by the mailer, read here.
+     *
+     * <p>Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     *
+     * <p>It is also what a republish policy would have to consult — today the fallback job puts a
+     * recipient that has failed ten times back on the queue exactly like one that has never been
+     * tried, and it could not tell them apart even if it wanted to.
+     */
+    @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
+    private int attempts;
+
+    @Column(name = "created_on", columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
 
@@ -85,6 +100,14 @@ public class Recipient {
 
     public void setProcessed(boolean processed) {
         this.processed = processed;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
     }
 
     public LocalDateTime getCreatedAt() {

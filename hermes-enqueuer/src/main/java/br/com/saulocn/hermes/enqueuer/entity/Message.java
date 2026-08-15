@@ -2,7 +2,15 @@ package br.com.saulocn.hermes.enqueuer.entity;
 
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
+/**
+ * The message this module never sends, only counts rows against.
+ *
+ * <p>Columns it does not use are mapped anyway: each module runs {@code drop-and-create} against
+ * its own test database, so a column missing here builds a different message table than the api
+ * and the mailer build, and the schemas only diverge where nobody is looking.
+ */
 @Entity
 @Table(schema = "hermes", name = "message")
 public class Message {
@@ -18,6 +26,13 @@ public class Message {
 
     @Column(name = "message_text")
     private String text;
+
+    @Column(name = "content_type")
+    private String contentType;
+
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
+    private LocalDateTime createdAt;
 
     public Long getId() {
         return id;

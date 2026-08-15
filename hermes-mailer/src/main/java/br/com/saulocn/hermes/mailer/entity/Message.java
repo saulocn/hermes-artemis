@@ -2,6 +2,7 @@ package br.com.saulocn.hermes.mailer.entity;
 
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(schema = "hermes", name = "message")
@@ -21,6 +22,13 @@ public class Message {
 
     @Column(name = "content_type")
     private String contentType;
+
+    // Not read here. Mapped so this module's drop-and-create builds the same message table the
+    // api and the enqueuer build — a column present in one schema and absent in another is a
+    // difference that only surfaces when a query written elsewhere runs here.
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
+    private LocalDateTime createdAt;
 
 
     public Long getId() {
