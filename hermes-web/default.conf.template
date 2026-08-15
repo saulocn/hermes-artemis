@@ -1,0 +1,38 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # A API é servida na mesma origem da tela, então o browser nunca faz requisição
+    # cross-origin e não é preciso configurar CORS no lado Quarkus.
+    #
+    # O upstream vem de variável porque os dois modos de execução são diferentes:
+    #   - docker compose  -> hermes-api:8080 (a rede do compose tem DNS por nome de serviço)
+    #   - make run-all    -> host.docker.internal:8080 (os módulos Java rodam com
+    #                        --network host, e a bridge default não resolve nome)
+    # O nginx resolve o proxy_pass no startup, então um nome inexistente derruba o
+    # container em vez de falhar só na requisição.
+    #
+    # A substituição é feita pelo próprio entrypoint da imagem (20-envsubst-on-templates.sh),
+    # que só troca variáveis presentes no ambiente — $uri, $host, $remote_addr e $scheme
+    # abaixo passam intactos.
+    #
+    # As barras finais importam: /api/admin/stats precisa chegar ao backend como /admin/stats.
+    location /api/ {
+        proxy_pass http://${HERMES_API_UPSTREAM}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+    }
+
+    # Rotas do client-side router são caminhos da aplicação, não arquivos faltando.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
