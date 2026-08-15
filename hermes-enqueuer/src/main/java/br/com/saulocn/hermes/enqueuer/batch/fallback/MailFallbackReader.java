@@ -26,7 +26,7 @@ public class MailFallbackReader extends AbstractItemReader {
     @Inject
     Logger log;
 
-    /** Same cap and same reasoning as MailReader.MAX_RECIPIENTS_PER_RUN. */
+    /** Same cap and same reasoning as MailReader's maxRecipientsPerRun. */
     @ConfigProperty(name = "hermes.enqueuer.max-recipients-per-run", defaultValue = "30000")
     int maxRecipientsPerRun;
 

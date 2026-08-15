@@ -2,7 +2,6 @@ package br.com.saulocn.hermes.enqueuer.batch;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
 
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -18,10 +17,4 @@ public class AckFailureTestProfile extends BatchTestProfile {
         return Set.of(RefusingPublisher.class);
     }
 
-    @Override
-    public Map<String, String> getConfigOverrides() {
-        // The in-memory connector still has to exist for the channel to resolve, even though
-        // RefusingPublisher never reaches it.
-        return super.getConfigOverrides();
-    }
 }

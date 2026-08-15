@@ -26,7 +26,7 @@ public class MailConsumerTestProfile implements QuarkusTestProfile {
         config.put("quarkus.transaction-manager.default-transaction-timeout", "30s");
         config.put("quarkus.http.test-port", "0");
 
-        // Mirrors application.sample.properties, including the env-driven address.
+        // Mirrors application.properties, including the env-driven address.
         config.put("mp.messaging.outgoing.mail-requests.connector", "smallrye-amqp");
         config.put("mp.messaging.outgoing.mail-requests.durable", "true");
         config.put("mp.messaging.outgoing.mail-requests.address", "${MQ_MAIL_ADDRESS:jms.queue.MailQueue}");

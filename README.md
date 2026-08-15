@@ -66,7 +66,7 @@ Os dois jobs também podem ser disparados na hora pelo console ou por `POST /job
 
 Os três módulos Java rodam em **Quarkus 3.38.2** e exigem **JDK 17 ou superior** (foram validados no JDK 25). O build usa o wrapper `./mvnw` de cada módulo — não é preciso ter Maven instalado. A tela precisa de Node 22 para build local, mas o `docker compose` a constrói sozinho.
 
-O `application.properties` de cada módulo é versionado: todo valor nele vem de variável de ambiente com default, sem segredo. Um clone limpo roda `docker compose up` direto. (Ele já foi gitignored, o que obrigava a copiar o `.sample` na mão e quebrava build em máquina nova.)
+O `application.properties` de cada módulo é versionado: todo valor nele vem de variável de ambiente com default, sem segredo. Um clone limpo roda `docker compose up` direto. (Ele já foi gitignored, o que obrigava a copiar um `application.sample.properties` na mão e quebrava build em máquina nova. Os `.sample` foram removidos: com o arquivo real versionado, eram três cópias byte a byte idênticas que nada obrigava a permanecerem iguais.)
 
 ### Docker Compose
 
