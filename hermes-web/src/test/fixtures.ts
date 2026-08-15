@@ -59,6 +59,7 @@ export const recipientsPage: RecipientsPage = {
       messageId: 1,
       processed: false,
       sent: false,
+      attempts: 0,
       createdAt: '2026-08-14T10:00:00Z',
     },
   ],

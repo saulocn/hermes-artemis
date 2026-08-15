@@ -330,6 +330,11 @@ th {
   border-color: var(--color-primary);
 }
 
+.badge.failing {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
 .badge.delivered {
   color: var(--color-success);
   border-color: var(--color-success);

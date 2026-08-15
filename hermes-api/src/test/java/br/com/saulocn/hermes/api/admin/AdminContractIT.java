@@ -1,5 +1,6 @@
 package br.com.saulocn.hermes.api.admin;
 
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -197,6 +198,102 @@ public class AdminContractIT {
                 .then()
                 .statusCode(200)
                 .body("total", greaterThanOrEqualTo(1));
+    }
+
+    /**
+     * The bucket the dashboard counts has to be reachable from the list, or the operator sees a
+     * number with no way to find the rows behind it. `state=failing` used to match no arm of the
+     * where clause at all, so it answered 200 with zero rows — indistinguishable from "none".
+     */
+    @Test
+    void failingRecipientsCanBeListedAndCarryTheirAttemptCount() {
+        String email = "failing-" + UUID.randomUUID() + "@example.com";
+        seedRecipient(email);
+        markFailing(email, 3);
+
+        given()
+                .when()
+                .get("/admin/recipients?state=failing&email=" + email)
+                .then()
+                .statusCode(200)
+                .body("total", equalTo(1))
+                .body("items[0].email", equalTo(email))
+                .body("items[0].attempts", equalTo(3));
+
+        // And it is not confused with a row that is merely queued.
+        given()
+                .when()
+                .get("/admin/recipients?state=pending&email=" + email)
+                .then()
+                .statusCode(200)
+                .body("total", equalTo(0));
+    }
+
+    /** A state the server does not know is a bad request, not an empty result. */
+    @Test
+    void anUnknownStateIsRejected() {
+        given()
+                .when()
+                .get("/admin/recipients?state=bogus")
+                .then()
+                .statusCode(400)
+                .body("states", hasItems("pending", "inFlight", "failing", "delivered"));
+    }
+
+    /** Retrying says the past failures no longer describe the row, so the count goes with them. */
+    @Test
+    void retryClearsTheAttemptCount() {
+        String email = "retry-" + UUID.randomUUID() + "@example.com";
+        seedRecipient(email);
+        markFailing(email, 2);
+
+        Integer id = given()
+                .when()
+                .get("/admin/recipients?email=" + email)
+                .then()
+                .statusCode(200)
+                .extract().path("items[0].id");
+
+        given().when().post("/admin/recipients/" + id + "/retry").then().statusCode(200);
+
+        given()
+                .when()
+                .get("/admin/recipients?email=" + email)
+                .then()
+                .statusCode(200)
+                .body("items[0].attempts", equalTo(0))
+                .body("items[0].processed", equalTo(false));
+    }
+
+    private void seedRecipient(String email) {
+        given()
+                .contentType(ContentType.JSON)
+                .body(Map.of(
+                        "title", "State test " + UUID.randomUUID(),
+                        "text", "Test message",
+                        "contentType", "text/html",
+                        "recipients", List.of(email)))
+                .when()
+                .post("/message")
+                .then()
+                .statusCode(200);
+    }
+
+    /**
+     * What the mailer leaves behind when a send throws: claim rolled back, counter kept.
+     *
+     * <p>Driven through {@code QuarkusTransaction} rather than {@code @Transactional}, because
+     * calling an annotated method on {@code this} from another test method skips the interceptor.
+     */
+    private void markFailing(String email, int attempts) {
+        QuarkusTransaction.requiringNew().run(() -> em.createNativeQuery("""
+                update hermes.recipient
+                   set recipient_processed = true, recipient_sent = false, recipient_attempts = :attempts
+                 where recipient_mail = :email
+                """)
+                .setParameter("attempts", attempts)
+                .setParameter("email", email)
+                .executeUpdate());
     }
 
     @Test

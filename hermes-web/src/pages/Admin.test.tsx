@@ -331,6 +331,51 @@ describe('Admin page', () => {
     });
   });
 
+  it('separates a failing recipient from one merely in flight, and shows the count', async () => {
+    // Both read processed=true, sent=false. The attempt count is the only thing that tells them
+    // apart, which is why it has to reach the list at all.
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/recipients': {
+        ...recipientsPage,
+        total: 2,
+        items: [
+          { ...recipientsPage.items[0], id: 1, email: 'queued@example.com', processed: true, sent: false, attempts: 0 },
+          { ...recipientsPage.items[0], id: 2, email: 'stuck@example.com', processed: true, sent: false, attempts: 4 },
+        ],
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Admin />);
+
+    await waitFor(() =>
+      expect(screen.getByText('stuck@example.com')).toBeInTheDocument(),
+    );
+    // By role, not by text: the dropdown carries the same words as the badges.
+    expect(screen.getAllByRole('status').map((badge) => badge.textContent))
+      .toEqual(['Em trânsito', 'Falhando (4)']);
+  });
+
+  it('offers the failing state as a filter, so the dashboard count can be opened', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async () => jsonResponse(recipientsPage));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Admin />);
+
+    await waitFor(() =>
+      expect(screen.getByText('ana@example.com')).toBeInTheDocument(),
+    );
+
+    await user.selectOptions(screen.getByLabelText('Filtrar por estado'), 'failing');
+    await user.click(screen.getByRole('button', { name: 'Buscar' }));
+
+    await waitFor(() => {
+      const request = expectRequest(fetchMock, fetchMock.mock.calls.length - 1);
+      expect(request.url).toContain('state=failing');
+    });
+  });
+
   it('resets page to 0 when filtering', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async () => jsonResponse(recipientsPage));

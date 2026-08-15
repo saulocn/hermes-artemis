@@ -52,11 +52,21 @@ public class AdminResource {
 
     @GET
     @Path("/recipients")
-    public AdminVOs.Page<AdminVOs.RecipientSummary> recipients(@QueryParam("email") String email,
-                                                               @QueryParam("state") String state,
-                                                               @QueryParam("page") @DefaultValue("0") int page,
-                                                               @QueryParam("size") @DefaultValue("20") int size) {
-        return dashboard.recipients(email, state, Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+    public Response recipients(@QueryParam("email") String email,
+                               @QueryParam("state") String state,
+                               @QueryParam("page") @DefaultValue("0") int page,
+                               @QueryParam("size") @DefaultValue("20") int size) {
+        try {
+            return Response.ok(dashboard.recipients(email, state,
+                    Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE))).build();
+        } catch (IllegalArgumentException e) {
+            // A state the server does not know is a bad request, not an empty result: answering
+            // 200 with zero rows is indistinguishable from "no recipient is in that state".
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(java.util.Map.of("error", e.getMessage(),
+                            "states", RecipientState.wireNames()))
+                    .build();
+        }
     }
 
     @POST

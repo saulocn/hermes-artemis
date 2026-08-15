@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   ApiError,
+  RECIPIENT_STATES,
   getRecipients,
   retryRecipient,
   triggerJob,
@@ -10,11 +11,9 @@ import {
 
 const PAGE_SIZE = 20;
 
-const STATE_LABELS: Record<RecipientState, string> = {
-  pending: 'Pendente',
-  inFlight: 'Em trânsito',
-  delivered: 'Entregue',
-};
+const STATE_LABELS = Object.fromEntries(
+  RECIPIENT_STATES.map((s) => [s.value, s.label]),
+) as Record<RecipientState, string>;
 
 function describeError(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -28,9 +27,11 @@ function formatDate(iso: string): string {
   return date.toLocaleString('pt-BR');
 }
 
+// Same reading the server does in RecipientState, in the same order: `failing` is a subset of
+// `inFlight`, so it has to be tested first or it can never be reached.
 function recipientState(recipient: Recipient): RecipientState {
   if (recipient.sent) return 'delivered';
-  if (recipient.processed) return 'inFlight';
+  if (recipient.processed) return recipient.attempts > 0 ? 'failing' : 'inFlight';
   return 'pending';
 }
 
@@ -161,9 +162,11 @@ function RecipientsPanel() {
           aria-label="Filtrar por estado"
         >
           <option value="">Todos os estados</option>
-          <option value="pending">Pendente</option>
-          <option value="inFlight">Em trânsito</option>
-          <option value="delivered">Entregue</option>
+          {RECIPIENT_STATES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
         </select>
         <button type="submit">Buscar</button>
       </form>
@@ -197,7 +200,11 @@ function RecipientsPanel() {
                   <td>{recipient.email}</td>
                   <td>{recipient.messageId}</td>
                   <td>
-                    <span role="status" className={`badge ${st}`}>{STATE_LABELS[st]}</span>
+                    <span role="status" className={`badge ${st}`}>
+                      {STATE_LABELS[st]}
+                      {/* The count is the whole reason this state is separate from "em trânsito". */}
+                      {st === 'failing' && ` (${recipient.attempts})`}
+                    </span>
                   </td>
                   <td>{formatDate(recipient.createdAt)}</td>
                   <td>

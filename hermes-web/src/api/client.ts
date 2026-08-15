@@ -129,7 +129,22 @@ export function getMessages(params: { page?: number; size?: number; q?: string }
 
 // ---- Admin: recipients -----------------------------------------------------
 
-export type RecipientState = 'pending' | 'inFlight' | 'delivered';
+/**
+ * The states a recipient row can be read as, named once.
+ *
+ * The server owns the same list in `RecipientState`; these are the wire names it accepts. Keeping
+ * the label next to the value is what stops a state from existing in the filter but not the
+ * legend, or the other way round — `failing` shipped as a dashboard count with no filter arm and
+ * no option in the dropdown, because those lived in three separate lists.
+ */
+export const RECIPIENT_STATES = [
+  { value: 'pending', label: 'Pendente' },
+  { value: 'inFlight', label: 'Em trânsito' },
+  { value: 'failing', label: 'Falhando' },
+  { value: 'delivered', label: 'Entregue' },
+] as const;
+
+export type RecipientState = (typeof RECIPIENT_STATES)[number]['value'];
 
 export interface Recipient {
   id: number;
@@ -137,6 +152,8 @@ export interface Recipient {
   messageId: number;
   processed: boolean;
   sent: boolean;
+  /** How many sends threw for this row. Zero means "never failed", not "never tried". */
+  attempts: number;
   createdAt: string;
 }
 

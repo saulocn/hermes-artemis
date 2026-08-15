@@ -39,8 +39,13 @@ public final class AdminVOs {
                                  long recipientCount, long sentCount) {
     }
 
+    /**
+     * {@code attempts} is here so the console can tell a failing row from one merely in flight.
+     * The two booleans read the same for both, so without it the list could not show the state
+     * the dashboard was already counting.
+     */
     public record RecipientSummary(Long id, String email, Long messageId, boolean processed,
-                                   boolean sent, LocalDateTime createdAt) {
+                                   boolean sent, int attempts, LocalDateTime createdAt) {
     }
 
     public record Page<T>(int page, int size, long total, List<T> items) {
