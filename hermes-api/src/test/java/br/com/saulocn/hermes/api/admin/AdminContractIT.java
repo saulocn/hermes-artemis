@@ -73,6 +73,7 @@ public class AdminContractIT {
                 .statusCode(200)
                 .body("pending", greaterThanOrEqualTo(2))
                 .body("inFlight", notNullValue())
+                .body("failing", notNullValue())
                 .body("delivered", notNullValue())
                 .body("totalMessages", notNullValue());
         // oldestPendingSeconds may be present or null

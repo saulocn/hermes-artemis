@@ -14,11 +14,15 @@ public final class AdminVOs {
     }
 
     /**
-     * The three observable states, derived from the two booleans on recipient.
-     * {@code inFlight} means published to the broker but not yet delivered.
+     * What the recipient table looks like right now.
+     *
+     * <p>{@code pending}, {@code inFlight} and {@code delivered} come from the two booleans.
+     * {@code failing} is a subset of {@code inFlight}: published, undelivered, and known to have
+     * thrown at least once. Without it a message stuck in a retry loop and a message merely
+     * waiting in a queue are the same number.
      */
-    public record Stats(long pending, long inFlight, long delivered, long totalMessages,
-                        Long oldestPendingSeconds) {
+    public record Stats(long pending, long inFlight, long failing, long delivered,
+                        long totalMessages, Long oldestPendingSeconds) {
     }
 
     public record ThroughputPoint(String minute, long delivered) {

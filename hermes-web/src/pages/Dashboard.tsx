@@ -109,6 +109,10 @@ export default function Dashboard() {
             <dt>Em trânsito</dt>
             <dd>{stats.inFlight}</dd>
           </dl>
+          <dl className={stats.failing > 0 ? 'stat-card stat-card-alert' : 'stat-card'}>
+            <dt>Falhando</dt>
+            <dd>{stats.failing}</dd>
+          </dl>
           <dl className="stat-card">
             <dt>Entregues</dt>
             <dd>{stats.delivered}</dd>
@@ -122,7 +126,10 @@ export default function Dashboard() {
 
       <p className="hint">
         <strong>Em trânsito</strong> significa que o destinatário já foi publicado no broker de
-        mensagens, mas ainda não foi confirmado como entregue pelo mailer.
+        mensagens, mas ainda não foi confirmado como entregue pelo mailer.{' '}
+        <strong>Falhando</strong> é a parte desses cujo envio já lançou erro ao menos uma vez —
+        sem essa distinção, uma mensagem presa em retentativa e uma apenas aguardando na fila
+        aparecem como o mesmo número.
       </p>
 
       <div className="card">

@@ -358,3 +358,12 @@ th {
   flex: 1;
   min-width: 200px;
 }
+
+/* Only when it is non-zero: a failing count of zero is the normal state and should not shout. */
+.stat-card-alert {
+  border-color: var(--color-danger);
+}
+
+.stat-card-alert dd {
+  color: var(--color-danger);
+}

@@ -27,6 +27,11 @@ public class Recipient {
     @Column(name = "recipient_processed")
     private boolean processed;
 
+    // Written by the consumer in its own transaction, so a failed send leaves a trace even
+    // though the rollback undoes everything else. Zero means "never failed", not "never tried".
+    @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
+    private int attempts;
+
     @Column(name = "created_on")
     private LocalDateTime createdAt;
 
@@ -88,6 +93,14 @@ public class Recipient {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
     }
 
     @Override

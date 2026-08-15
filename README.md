@@ -46,6 +46,8 @@ O estado de cada destinatário vive em dois booleanos na tabela `hermes.recipien
 | Em trânsito | `true` | `false` | Publicado, aguardando consumo |
 | Entregue | `true` | `true` | E-mail enviado |
 
+Há um quarto, que é um subconjunto de "em trânsito": **falhando**, quando `recipient_attempts > 0`. Um envio que lança faz rollback do claim e a linha volta a `processed=true, sent=false` — exatamente o que uma mensagem só aguardando na fila parece. Sem o contador, uma mensagem presa em retentativa e uma apenas enfileirada eram o mesmo número no painel, para sempre. O contador é gravado em transação própria, porque o rollback que devolve a mensagem à fila desfaria qualquer coisa escrita na transação do consumo.
+
 **Fluxo.** `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MessageService#mailConsumer` consome, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
 
 **Rede de segurança.** `MailFallbackJob` roda a cada 10 minutos e republica o que continua `sent = false` há mais de 10 minutos. Isso recupera qualquer coisa que se perca entre a publicação e a entrega, ao custo de gerar duplicatas quando o consumo está atrasado — por isso o consumo é idempotente (ver "O que foi corrigido").

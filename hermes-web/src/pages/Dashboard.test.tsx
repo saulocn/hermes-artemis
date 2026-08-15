@@ -12,6 +12,25 @@ describe('Dashboard page', () => {
     vi.useRealTimers();
   });
 
+  it('shows the failing count apart from in flight', async () => {
+    // A message stuck in a retry loop and one merely waiting in the queue both read
+    // processed=true, sent=false. Before the failing bucket existed they were one number.
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/stats': { ...adminStats, inFlight: 5, failing: 2 },
+      '/api/admin/broker': brokerStatus,
+      '/api/admin/throughput': throughput,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Dashboard />);
+
+    await waitFor(() => {
+      // selector: 'dt' because both labels also appear in the explanatory paragraph below.
+      expect(screen.getByText('Falhando', { selector: 'dt' }).closest('dl')).toHaveTextContent('2');
+    });
+    expect(screen.getByText('Em trânsito', { selector: 'dt' }).closest('dl')).toHaveTextContent('5');
+  });
+
   it('renders stat values, broker info, and throughput chart after loading', async () => {
     const fetchMock = mockFetchRoutes({
       '/api/admin/stats': adminStats,

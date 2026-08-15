@@ -11,6 +11,7 @@ import {
 
 export const adminStats: AdminStats = {
   pending: 3,
+  failing: 0,
   inFlight: 2,
   delivered: 10,
   totalMessages: 15,

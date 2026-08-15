@@ -32,6 +32,8 @@ public class DashboardService {
                 select
                   count(*) filter (where not recipient_processed and not recipient_sent),
                   count(*) filter (where recipient_processed and not recipient_sent),
+                  count(*) filter (where recipient_processed and not recipient_sent
+                                     and recipient_attempts > 0),
                   count(*) filter (where recipient_sent),
                   min(created_on) filter (where not recipient_sent)
                 from hermes.recipient
@@ -41,8 +43,8 @@ public class DashboardService {
                 .getSingleResult()).longValue();
 
         Long oldestPendingSeconds = null;
-        if (row[3] != null) {
-            LocalDateTime oldest = toLocalDateTime(row[3]);
+        if (row[4] != null) {
+            LocalDateTime oldest = toLocalDateTime(row[4]);
             oldestPendingSeconds = java.time.Duration.between(oldest, LocalDateTime.now()).getSeconds();
         }
 
@@ -50,6 +52,7 @@ public class DashboardService {
                 ((Number) row[0]).longValue(),
                 ((Number) row[1]).longValue(),
                 ((Number) row[2]).longValue(),
+                ((Number) row[3]).longValue(),
                 totalMessages,
                 oldestPendingSeconds);
     }

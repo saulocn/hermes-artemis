@@ -31,6 +31,9 @@ public class MessageService {
     @Inject
     EntityManager entityManager;
 
+    @Inject
+    DeliveryAttempts deliveryAttempts;
+
     // JDBC and the SMTP client both block, so this must not run on the event loop. The named
     // pool is what smallrye.messaging.worker.mail-sender-pool.max-concurrency sizes — that
     // property was configured but had nothing referencing it until now.
@@ -67,7 +70,16 @@ public class MessageService {
         MailVO mailVO = findById(recipientVO.getMessageId());
         mailVO.setTo(recipientVO.getEmail());
         mailVO.setRecipientId(recipientVO.getId());
-        mailSenderService.sendHtmlMail(mailVO);
+
+        try {
+            mailSenderService.sendHtmlMail(mailVO);
+        } catch (RuntimeException e) {
+            // Count the failure before letting it propagate. Rethrowing rolls this transaction
+            // back — including the claim above, which is what puts the message back on the queue
+            // — so the counter has to be written somewhere that rollback cannot reach.
+            deliveryAttempts.recordFailure(recipientVO.getId(), e);
+            throw e;
+        }
     }
 
 
