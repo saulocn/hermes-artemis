@@ -1,6 +1,6 @@
 package br.com.saulocn.hermes.enqueuer.resource;
 
-import org.jboss.logging.Logger;
+import br.com.saulocn.hermes.enqueuer.batch.JobLauncher;
 
 import jakarta.batch.operations.JobOperator;
 import jakarta.batch.runtime.BatchRuntime;
@@ -13,7 +13,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
-import java.util.Properties;
+import java.util.OptionalLong;
 
 /**
  * Manual triggers for the batch jobs, so the console does not have to wait out the schedules
@@ -27,28 +27,32 @@ import java.util.Properties;
 @Produces(MediaType.APPLICATION_JSON)
 public class JobResource {
 
-    private static final Map<String, String> JOBS = Map.of(
-            "enqueue", "mail-enqueuer-chunk",
-            "fallback", "mail-fallback-chunk");
+    private static final Map<String, JobLauncher.Job> JOBS = Map.of(
+            "enqueue", JobLauncher.Job.ENQUEUE,
+            "fallback", JobLauncher.Job.FALLBACK);
 
     @Inject
-    Logger log;
+    JobLauncher jobLauncher;
 
     @POST
     @Path("/{job}")
     public Response start(@PathParam("job") String job) {
-        String jobName = JOBS.get(job);
-        if (jobName == null) {
+        JobLauncher.Job target = JOBS.get(job);
+        if (target == null) {
             return Response.status(Response.Status.NOT_FOUND)
                     .entity(Map.of("error", "unknown job: " + job, "known", JOBS.keySet()))
                     .build();
         }
 
-        // Deliberately fire-and-forget: the scheduled triggers behave the same way, and the
-        // caller polls GET /jobs/{executionId} if it wants the outcome.
-        long executionId = BatchRuntime.getJobOperator().start(jobName, new Properties());
-        log.info("Job " + jobName + " started on demand, execution " + executionId);
-        return Response.ok(Map.of("executionId", executionId)).build();
+        OptionalLong executionId = jobLauncher.startIfIdle(target);
+        if (executionId.isEmpty()) {
+            // 409 rather than 200: the caller asked for a run and did not get one. Silently
+            // returning success would hide that a run was already publishing the same rows.
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", "job already running", "job", job))
+                    .build();
+        }
+        return Response.ok(Map.of("executionId", executionId.getAsLong())).build();
     }
 
     @GET

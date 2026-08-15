@@ -6,6 +6,7 @@ x-app-resources: &app-resources
     cpus: '1'
     memory: '512M'
 
+# Tela e cache fazem pouco; 0.5 CPU sobra para os dois.
 x-small-resources: &small-resources
   limits:
     cpus: '0.5'
@@ -13,6 +14,18 @@ x-small-resources: &small-resources
   reservations:
     cpus: '0.5'
     memory: '128M'
+
+# Broker e banco são compartilhados por todos os consumidores e foram medidos saturados a
+# 0.5 CPU: o broker chegava a ~108% da própria quota e a vazão travava em ~1200/s por mais
+# réplicas de mailer que se subisse. Com esta faixa o gargalo volta para os mailers e a
+# entrega passou de ~1200/s para 2308/s na mesma máquina.
+x-shared-resources: &shared-resources
+  limits:
+    cpus: '2'
+    memory: '1024M'
+  reservations:
+    cpus: '1'
+    memory: '256M'
 
 x-db-env: &db-env
   DB_USERNAME: hermes
@@ -113,7 +126,7 @@ services:
       context: ./db/
     image: saulocn/hermes-pg
     deploy:
-      resources: *small-resources
+      resources: *shared-resources
     ports:
       - 5432:5432
     environment:
@@ -194,7 +207,7 @@ services:
       context: ./artemis/
     image: saulocn/hermes-mq
     deploy:
-      resources: *small-resources
+      resources: *shared-resources
     ports:
       - 8161:8161
     environment:
@@ -213,7 +226,7 @@ services:
       context: ./rabbit/
     image: saulocn/hermes-rabbit
     deploy:
-      resources: *small-resources
+      resources: *shared-resources
     ports:
       - 15672:15672
       - 5672:5672

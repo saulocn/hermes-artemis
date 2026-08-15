@@ -70,13 +70,24 @@ public class AdminResource {
 
     @POST
     @Path("/jobs/enqueue")
-    public AdminVOs.JobStarted triggerEnqueue() {
-        return jobs.trigger("enqueue");
+    public Response triggerEnqueue() {
+        return trigger("enqueue");
     }
 
     @POST
     @Path("/jobs/fallback")
-    public AdminVOs.JobStarted triggerFallback() {
-        return jobs.trigger("fallback");
+    public Response triggerFallback() {
+        return trigger("fallback");
+    }
+
+    private Response trigger(String job) {
+        try {
+            return Response.ok(jobs.trigger(job)).build();
+        } catch (JobTriggerService.JobAlreadyRunningException e) {
+            // 409 all the way to the console: a declined trigger is not an error, and the screen
+            // should say "already running" rather than show a failure banner.
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(java.util.Map.of("error", e.getMessage())).build();
+        }
     }
 }

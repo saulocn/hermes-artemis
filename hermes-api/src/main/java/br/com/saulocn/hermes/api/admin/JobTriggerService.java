@@ -40,6 +40,12 @@ public class JobTriggerService {
                     .build();
 
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            // The enqueuer answers 409 when a run of the same job is already in flight. That is a
+            // meaningful answer, not a failure, so it is distinguished here instead of collapsing
+            // into a generic error the console would render as a 500.
+            if (response.statusCode() == 409) {
+                throw new JobAlreadyRunningException(job);
+            }
             if (response.statusCode() / 100 != 2) {
                 throw new IllegalStateException("enqueuer returned HTTP " + response.statusCode());
             }
@@ -51,6 +57,13 @@ public class JobTriggerService {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("could not reach the enqueuer at " + enqueuerUrl, e);
+        }
+    }
+
+    /** A run of this job was already in flight; the trigger was declined, nothing failed. */
+    public static class JobAlreadyRunningException extends RuntimeException {
+        public JobAlreadyRunningException(String job) {
+            super("job already running: " + job);
         }
     }
 }

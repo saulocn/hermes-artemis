@@ -1,30 +1,58 @@
 # hermes
 
-O Hermes é um sistema de envio de notificações baseado em eventos.
-A idéia é que uma requisição de envio de notificação seja feita na API que criará o modelo de mensagem e enviará um evento para o consumidor que enviará a mensagem para cada endereço de e-mail requisitado.
+O Hermes envia notificações por e-mail em lote. Uma requisição chega na API, que grava a mensagem e seus destinatários no Postgres; um job periódico publica cada destinatário numa fila; um consumidor lê da fila e envia o e-mail.
 
-![Arquitetura inicial do projeto](docs/hermes-doc.jpg "Arquitetura inicial do projeto")
+```mermaid
+flowchart LR
+    U([Cliente]) -->|POST /message| API
+    OP([Operador]) -->|:8090| WEB
 
-A idéia é a requisição chegar através do Hermes API onde será armazenada em um banco de dados (PostgreSQL).
-Um job roda periodicamente, definido em `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` (no Hermes Enqueuer) pela anotação `@Scheduled(every = "30s")`. Este job é responsável por ler todas os destinatários de e-mails da tabela `hermes.recipient` que não foram processados (flag `recipient_processed`) e, colocar na fila JMS `jms.queue.MailQueue`.
+    subgraph app[Aplicação]
+        API[hermes-api<br/>ingestão + API de admin]
+        ENQ[hermes-enqueuer<br/>job a cada 30s]
+        MAI[hermes-mailer<br/>consumidor]
+        WEB[hermes-web<br/>console nginx + React]
+    end
 
-Cada uma dessas mensagens será processada pelo método `br.com.saulocn.hermes.mailer.service.MessageService#mailConsumer` que obterá a mensagem que deverá ser enviada e enviará ao destinatário. Caso haja qualquer falha, a mensagem retornará para a fila para ser processada numa retentativa.
+    subgraph infra[Infraestrutura]
+        DB[(Postgres<br/>message · recipient)]
+        CACHE[(Redis<br/>cache de mensagem)]
+        BROKER{{Broker AMQP 1.0<br/>Artemis ou RabbitMQ}}
+    end
 
-A fila é programada para ter 10 retentativas a cada 2 minutos:
+    API -->|grava| DB
+    API -->|aquece| CACHE
+    ENQ -->|lê processed=false| DB
+    ENQ -->|publica| BROKER
+    BROKER -->|consome| MAI
+    MAI -->|marca sent=true| DB
+    MAI -->|lê| CACHE
+    MAI -->|SMTP| MAIL([Servidor de e-mail])
+    WEB -->|/api| API
+    API -->|dispara job| ENQ
+    API -->|profundidade da fila| BROKER
 
+    classDef store fill:#eef,stroke:#88a
+    classDef ext fill:#efe,stroke:#8a8
+    class DB,CACHE store
+    class MAIL,U,OP ext
 ```
-<max-delivery-attempts>10</max-delivery-attempts>
-<redelivery-delay>120000</redelivery-delay>
-```
 
-Foi implementado um job de processamento em lote para reprocessar e-mails não enviados há 10 minutos:
+O estado de cada destinatário vive em dois booleanos na tabela `hermes.recipient`, e é deles que saem os três estados que o console mostra:
 
-```
-br.com.saulocn.hermes.enqueuer.batch.fallback.MailFallbackJob
-```
+| Estado | `processed` | `sent` | Significado |
+|---|---|---|---|
+| Pendente | `false` | `false` | Ainda não publicado no broker |
+| Em trânsito | `true` | `false` | Publicado, aguardando consumo |
+| Entregue | `true` | `true` | E-mail enviado |
 
-Os dois jobs também podem ser disparados na hora pela tela ou por `POST /jobs/{enqueue,fallback}` no enqueuer.
+**Fluxo.** `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MessageService#mailConsumer` consome, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
 
+**Rede de segurança.** `MailFallbackJob` roda a cada 10 minutos e republica o que continua `sent = false` há mais de 10 minutos. Isso recupera qualquer coisa que se perca entre a publicação e a entrega, ao custo de gerar duplicatas quando o consumo está atrasado — por isso o consumo é idempotente (ver "O que foi corrigido").
+
+**Retentativas no broker:** 10 tentativas. No Artemis com 2 minutos entre elas (`redelivery-delay`), no RabbitMQ sem espaçamento (não há equivalente para quorum queues).
+
+Os dois jobs também podem ser disparados na hora pelo console ou por `POST /jobs/{enqueue,fallback}` no enqueuer.
 
 ## Como iniciar
 
@@ -231,9 +259,51 @@ Números medidos **com os limites de recurso do `docker-compose.yml` aplicados**
 | Serviço | CPU | Memória |
 |---|---|---|
 | `hermes-api`, `enqueuer`, `mailer` | 1,0 | 1024 MB |
-| `hermes-db`, `hermes-cache`, `hermes-mq` / `hermes-rabbit`, `hermes-web` | 0,5 | 512 MB |
+| `hermes-db`, `hermes-mq` / `hermes-rabbit` | 2,0 | 1024 MB |
+| `hermes-cache`, `hermes-web` | 0,5 | 512 MB |
 
-### Evolução medida (10.000 destinatários, 100 mensagens × 100)
+O banco e o broker ficam numa faixa maior que a tela e o cache porque são **compartilhados por todos os consumidores**: medidos a 0,5 CPU, o broker chegava a ~108% da própria quota e travava o sistema (ver abaixo).
+
+### Onde está o gargalo
+
+Medido componente a componente, com os outros isolados. Este é o resultado mais útil da seção, porque contradiz a intuição:
+
+| Componente | Vazão isolada | CPU |
+|---|---|---|
+| **Enfileirador** | **~4.400/s** | ocioso após terminar |
+| **Mailer** (1 réplica) | ~1.100–1.500/s | ~60% de 1 CPU |
+| Entrega ponta a ponta | 1.200–1.450/s | — |
+
+O enfileirador é **4× mais rápido** que o consumidor: aumentá-lo só encheria a fila mais depressa. Para medi-lo sozinho, pare o mailer, semeie destinatários e observe `recipient_processed` subir.
+
+Escalar o mailer sozinho **também não resolve**:
+
+| Configuração | Vazão |
+|---|---|
+| 1 mailer, broker/banco 0,5 CPU | ~1.200/s |
+| 2–3 mailers, broker/banco 0,5 CPU | ~1.160–1.560/s — **sem ganho** |
+| 1 mailer, broker/banco 2 CPU | ~1.220–1.450/s — **sem ganho** |
+| **2 mailers, broker/banco 2 CPU** | **2.308/s** |
+
+Com o broker a 0,5 CPU, réplicas extras disputam um recurso saturado. Com o broker folgado mas um consumidor só, o consumidor limita. **As duas coisas precisam andar juntas** — é por isso que o compose separa a faixa de recursos do banco e do broker.
+
+Para ir além de ~2.300/s: `docker compose up -d --scale mailer-rabbit=N` e acompanhar de quem é a CPU saturada a cada passo.
+
+### Medições de referência (10.000 e 100.000 destinatários)
+
+Com a configuração padrão do compose (1 mailer):
+
+| | Artemis | RabbitMQ |
+|---|---|---|
+| 10.000 | 244–769/s | 667/s |
+| **100.000** | **1.449/s** | **1.220/s** |
+| Não entregues | 0 | 0 |
+
+**Confie na linha de 100 mil.** O teste de 10 mil drena em 13–41s com polling a cada 2s, então a resolução é péssima e os valores oscilaram entre 244 e 769/s entre execuções da mesma configuração. Com ~70–80s de janela a medição estabiliza.
+
+Ingestão medida à parte com k6 (1 VU): **6.748 destinatários/s**. A API não é o gargalo; ela só insere no Postgres.
+
+### Evolução histórica (10.000 destinatários)
 
 Cada etapa isola o efeito de uma mudança:
 
@@ -241,29 +311,10 @@ Cada etapa isola o efeito de uma mudança:
 |---|---|---|---|
 | 1. Baseline (Quarkus 3.36.2) | 256/s | 665/s | 4 e 20 |
 | 2. Quarkus 3.38.2 | 263/s | 832/s | 12 e 17 |
-| 3. Ack do broker + `@OnOverflow` + fim do lost update | 667/s | 667/s | **0 e 0** |
+| 3. Ack do broker + fim do lost update | 667/s | 667/s | **0 e 0** |
 | 4. Índices + pool 8 | 769/s | 667/s | 0 e 0 |
-| 5. JVM tunada + consumo idempotente | **769/s** | **769/s** | **0 e 0** |
 
-**Artemis ficou ~3× mais rápido** entre o baseline e hoje. O salto está na etapa 3: o que dominava antes era o estouro do buffer do emitter derrubando o job de batch no meio do lote.
-
-Duas ressalvas para ler a tabela com honestidade:
-
-- **A janela de dreno é de 13–15s e o benchmark faz polling a cada 2s**, ou seja ±15% de resolução. A diferença entre 667/s e 769/s é *um intervalo de polling*, não sinal.
-- **Neste tamanho o tuning de JVM não aparece.** 10 mil mensagens drenam antes de a pressão de GC se acumular, então a etapa 5 mede igual à 4. O efeito real está na tabela abaixo.
-
-### Em escala (100.000 destinatários)
-
-| | Artemis | RabbitMQ |
-|---|---|---|
-| Vazão sustentada | **1.190/s** | **1.429/s** |
-| Janela de dreno | 84s | 77s |
-| Não entregues | 0 | 0 |
-| Memória do mailer | 451 MiB | 536 MiB / 1 GiB |
-
-Quase o dobro do que o teste de 10 mil sugere — naquele tamanho o número é diluído pela rampa e pela granularidade do polling. Com uma janela de ~80s a medição fica bem mais confiável.
-
-Ingestão medida à parte com k6 (1 VU, cenário `smoke`): **6.748 destinatários/s**. A API não é o gargalo; ela só insere no Postgres.
+O salto está na etapa 3: o que dominava antes era o estouro do buffer do emitter derrubando o job de batch no meio do lote. **Os índices não aparecem aqui** — 10 mil linhas é pouco para um seq scan doer; o efeito deles foi medido no planner, com 200 mil linhas: custo 4062 → 303.
 
 ### Plataforma (Apple Silicon)
 
@@ -318,9 +369,9 @@ O `-XX:+ExitOnOutOfMemoryError` já vinha da imagem base — é por isso que o c
 
 ### Estimativa de volume
 
-- **Tempo até a primeira entrega é cadência, não capacidade**: o `MailEnqueuerJob` roda a cada 30s, então tudo espera ~15s em média mesmo com o sistema vazio. A tela permite pular essa espera com o disparo manual.
-- **Número de planejamento conservador: ~1.100 destinatários/s (~4 milhões/hora)** — o pior dos dois brokers na medição de 100 mil, que é a mais confiável. Ressalva: medido numa janela de ~80s, **não validado em regime de horas**; use o cenário `soak` do k6 para isso.
-- Há um teto explícito em `MailReader.MAX_RECIPIENTS_PER_RUN` (30.000). Ele divide pelo intervalo do scheduler e vira vazão máxima: 30.000 ÷ 30s ≈ 1.000/s — **já é o gargalo nesse patamar**. Se precisar de mais, suba o cap ou reduza o intervalo do scheduler; com 1.000 a medição deu 38/s.
+- **Tempo até a primeira entrega é cadência, não capacidade**: o `MailEnqueuerJob` roda a cada 30s, então tudo espera ~15s em média mesmo com o sistema vazio. O console permite pular essa espera com o disparo manual.
+- **Número de planejamento conservador: ~1.200 destinatários/s (~4,3 milhões/hora)** na configuração padrão, e **~2.300/s com dois mailers**. Ressalva: medido em janelas de ~70–80s, **não validado em regime de horas** — use o cenário `soak` do k6 para isso.
+- O cap do reader (`hermes.enqueuer.max-recipients-per-run`) dividido pelo intervalo do scheduler é um teto de vazão do *enfileirador*. No default de 100.000 ÷ 30s isso dá ~3.300/s, bem acima do que o consumidor entrega, então **não é mais o limitante** — mas é o número que decide quantas entidades o reader carrega de uma vez, e a 100.000 o enqueuer usa ~690 MiB de 1 GiB.
 
 ### Backlog grande
 
@@ -328,7 +379,9 @@ Um teste de carga acumulou 1,1 milhão de mensagens na fila e expôs o que não 
 
 - **Nada se perde.** Todas ficam no broker; `inFlight` alto significa "publicado, aguardando consumo", não perda. A DLQ ficou zerada o tempo todo.
 - **O consumidor é o gargalo, e ele pode morrer.** O mailer estourou o heap e saiu com exit 3. Ver a seção JVM — os defaults davam 256 MB de heap e SerialGC.
-- **O `MailFallbackJob` gera duplicatas quando o consumo atrasa.** Ele republica tudo com `sent = false` a cada 10 minutos, sem saber que aquilo já está enfileirado: 174 mil cópias em ~68 minutos. Por isso o consumo é idempotente (ver abaixo) — a duplicata é consumida, reconhecida e descartada sem enviar e-mail. Foram 16.615 descartes observados num único dreno.
+- **O `MailFallbackJob` gera duplicatas quando o consumo atrasa.** Ele republica tudo com `sent = false` a cada 10 minutos, sem saber que aquilo já está enfileirado: 174 mil cópias em ~68 minutos. Por isso o consumo é idempotente — a duplicata é consumida, reconhecida e descartada sem enviar e-mail. Foram 16.615 descartes observados num único dreno.
+
+> **Nem o Postgres nem o broker têm volume declarado.** Os dados vivem na camada gravável do container, então **recriar o container perde tudo** — foi assim que 296 mil mensagens enfileiradas sumiram ao ajustar limites de CPU no compose. Para um ambiente de desenvolvimento isso é aceitável e até conveniente (`make down` já limpa de propósito); para qualquer outra coisa, declare volumes.
 
 ### O que foi corrigido
 
@@ -345,6 +398,8 @@ Sob carga, uma fração das linhas ficava `processed=true, sent=false`. Eram **d
    ```
 
    Zero linhas atualizadas significa que outra cópia já entregou: o consumidor loga, retorna e o retorno normal **dá ack**, tirando a duplicata da fila em vez de deixá-la redelivering. O claim vem *antes* do envio de propósito — se o envio falhar, a transação reverte o claim junto e a mensagem é reentregue.
+
+4. **Publicação duplicada por disparo concorrente.** `ConcurrentExecution.SKIP` impede o `@Scheduled` de se sobrepor a si mesmo, mas não sabe do disparo manual pelo console — são caminhos diferentes para o mesmo job. Os dois liam `processed = false` e publicavam: uma execução medida deixou 272.700 mensagens na fila para 200.000 destinatários, ~72 mil publicações duplicadas. Hoje ambos passam por um `JobLauncher` que consulta `getRunningExecutions` antes de iniciar, e o endpoint responde **409** quando recusa, para o console dizer "já em execução" em vez de mostrar falha.
 
 O `MailFallbackJob` continua sendo a rede de segurança para o que escapar, com latência de recuperação de até ~20 minutos (até 10 min para entrar na janela + até 10 min para o próximo tick).
 
