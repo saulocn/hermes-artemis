@@ -188,6 +188,8 @@ services:
 
   hermes-mq:
     profiles: ["artemis"]
+    # Imagem base só-amd64; declarado para o compose não avisar a cada subida em arm64.
+    platform: linux/amd64
     build:
       context: ./artemis/
     image: saulocn/hermes-mq

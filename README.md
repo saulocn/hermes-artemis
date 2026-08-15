@@ -265,6 +265,19 @@ Quase o dobro do que o teste de 10 mil sugere — naquele tamanho o número é d
 
 Ingestão medida à parte com k6 (1 VU, cenário `smoke`): **6.748 destinatários/s**. A API não é o gargalo; ela só insere no Postgres.
 
+### Plataforma (Apple Silicon)
+
+A imagem base do Artemis, `saulocn/artemismq:2.22.0`, **só existe para amd64**. Todo o resto da stack é arm64 nativo. Em Mac com Apple Silicon isso significa que só o Artemis roda sob emulação, e o Docker avisa a cada subida:
+
+```
+The requested image's platform (linux/amd64) does not match the detected
+host platform (linux/arm64/v8) and no specific platform was requested
+```
+
+O `docker-compose.yml` declara `platform: linux/amd64` no serviço `hermes-mq`, o que remove o aviso e deixa a escolha explícita. **Não remove o custo**: a emulação é medida — o Artemis leva ~90s para ficar saudável, contra segundos do RabbitMQ. É por isso que o alvo `make test-e2e` espera até 150s.
+
+Se esse tempo incomodar, o caminho é trocar pela imagem oficial `apache/activemq-artemis`, que é multi-arch (amd64 e arm64) e está numa versão bem mais recente que a 2.22 de 2022. Não é um `FROM` diferente e pronto: a imagem oficial usa outro layout (instância em `/var/lib/artemis-instance`, override de config em `etc-override/`), então `artemis/Dockerfile` e o `ArtemisTestResource` dos testes precisariam acompanhar.
+
 ### JVM
 
 Os defaults da JVM em container pequeno são hostis, e isso derrubou o mailer drenando um backlog de 1,1 milhão de mensagens (`Terminating due to java.lang.OutOfMemoryError`). Medido dentro do container, antes de qualquer flag:

@@ -19,7 +19,7 @@ ALL_PROFILES := COMPOSE_PROFILES=artemis,rabbit
 	require-stack require-compose bench bench-rabbit loadtest \
 	run-db run-cache run-mq run-rabbit run-api run-enqueuer run-mailer run-web \
 	rm-db rm-cache rm-mq rm-rabbit rm-api rm-enqueuer rm-mailer rm-web rm-net \
-	run-all run-all-rabbit rm-all
+	run-all run-all-rabbit rm-all clean clean-images purge ps-all
 
 help: ## Lista os alvos disponíveis
 		@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -199,6 +199,26 @@ rm-net: ## Remove a rede dos containers avulsos
 		-docker network rm hermes-net 2>/dev/null || true
 
 rm-all: rm-mailer rm-enqueuer rm-api rm-web rm-db rm-mq rm-rabbit rm-cache rm-net ## Remove todos os containers avulsos
+
+# ---------------------------------------------------------------- limpeza
+# Há dois caminhos de execução (compose e containers avulsos) e eles não se enxergam:
+# `down` só alcança o compose, `rm-all` só os avulsos. `clean` cobre os dois.
+
+clean: down rm-all ## Remove containers e rede dos dois caminhos (compose e avulsos)
+		@echo "Containers e rede removidos."
+
+clean-images: clean ## O acima, mais as imagens construídas pelo projeto
+		-@docker images --format '{{.Repository}}:{{.Tag}}' \
+			| grep -E '^(saulocn/)?hermes-' \
+			| xargs -r docker rmi -f 2>/dev/null || true
+		@echo "Imagens do projeto removidas (as imagens base continuam em cache)."
+
+purge: clean-images ## O acima, mais volumes órfãos. Irreversível: apaga os dados do Postgres
+		docker volume prune -f
+		@echo "Volumes órfãos removidos."
+
+ps-all: ## Lista containers do projeto nos dois caminhos, inclusive parados
+		@docker ps -a --filter name=hermes --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 
 run-all: rm-all run-db run-mq run-cache run-mailer run-enqueuer run-api run-web ## Sobe todos os serviços avulsos com Artemis
 
