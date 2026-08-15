@@ -1,45 +1,40 @@
 package br.com.saulocn.hermes.enqueuer.batch.fallback;
 
-import br.com.saulocn.hermes.enqueuer.entity.Recipient;
-import br.com.saulocn.hermes.enqueuer.batch.vo.RecipientVO;
+import br.com.saulocn.hermes.enqueuer.batch.AbstractMailWriter;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
-import org.jboss.logging.Logger;
+import org.eclipse.microprofile.reactive.messaging.OnOverflow;
 
-import javax.batch.api.chunk.AbstractItemWriter;
-import javax.enterprise.context.Dependent;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.persistence.EntityManager;
-import java.util.List;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
-
+/**
+ * Republishes recipients the mailer has not delivered yet.
+ *
+ * <p>Note that this sets {@code processed}, while {@link MailFallbackReader} selects on
+ * {@code sent = false}. That is deliberate, not an oversight: the flag written here does not
+ * narrow this job's own selection, so a recipient keeps being republished every cycle until the
+ * mailer marks it sent. That repetition is the safety net — it is what recovers messages the
+ * broker dropped.
+ */
 @Dependent
 @Named
-public class MailFallbackWriter extends AbstractItemWriter {
+public class MailFallbackWriter extends AbstractMailWriter {
 
-    @Inject
-    Logger log;
-
+    /** Same reasoning as MailWriter: the default buffer of 128 is smaller than a chunk needs. */
     @Inject
     @Channel("mail-fallback-request")
+    @OnOverflow(value = OnOverflow.Strategy.BUFFER, bufferSize = 1024)
     Emitter<String> emitter;
 
-
-    @Inject
-    EntityManager entityManager;
+    @Override
+    protected Emitter<String> emitter() {
+        return emitter;
+    }
 
     @Override
-    public void writeItems(List<Object> list) throws Exception {
-        List<Recipient> recipients = (List<Recipient>)(List<?>) list;
-        recipients.stream()
-                .map(recipient -> new RecipientVO(recipient.getId(), recipient.getEmail(), recipient.getMessageId()))
-                .forEach(recipientVO -> {
-                    emitter.send(recipientVO.toJSON());
-                    Recipient recipient = entityManager.find(Recipient.class, recipientVO.getId());
-                    recipient.setProcessed(true);
-                    entityManager.merge(recipient);
-                    log.info("Sent to queue(fallback): "+recipientVO.getId());
-                });
+    protected String logPrefix() {
+        return "Sent to queue(fallback): ";
     }
 }
