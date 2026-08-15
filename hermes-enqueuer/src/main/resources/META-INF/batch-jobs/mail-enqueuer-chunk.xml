@@ -3,7 +3,6 @@
     <step id="enqueuer-chunk">
         <chunk checkpoint-policy="item" item-count="100">
             <reader ref="mailReader"/>
-            <processor ref="mailProcessor"/>
             <writer ref="mailWriter"/>
         </chunk>
     </step>

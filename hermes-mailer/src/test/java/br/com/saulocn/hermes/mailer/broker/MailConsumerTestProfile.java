@@ -6,10 +6,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Config lives here instead of src/test/resources/application.properties because the repo
- * .gitignore excludes **&#47;application.properties, which would make the suite unrunnable
- * on a clean clone. Datasource and Redis are left unset on purpose so Dev Services provide
- * them; the broker coordinates come from the test resource.
+ * Config lives in this profile rather than in src/test/resources/application.properties
+ * because the module's versioned application.properties pins quarkus.datasource.jdbc.url
+ * and quarkus.redis.hosts, which switches Dev Services off. A test-resource/profile value
+ * outranks it, so the suite behaves the same whatever a developer has locally.
+ *
+ * <p>Datasource and Redis coordinates come from InfraTestResource, the broker's from the
+ * broker test resource.
  */
 public class MailConsumerTestProfile implements QuarkusTestProfile {
 

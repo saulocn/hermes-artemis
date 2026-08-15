@@ -5,13 +5,9 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@NamedQuery(name = Recipient.FIND_NOT_PROCESSED, query = "select r from Recipient r where r.processed = false")
-@NamedQuery(name = Recipient.FIND_NOT_SENT_MINUTES, query = "select r from Recipient r where r.createdAt < :dateLimitToSend AND r.sent = false")
 @Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
-    public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
-    public static final String FIND_NOT_SENT_MINUTES = "Message.FindNotSentMinutes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")

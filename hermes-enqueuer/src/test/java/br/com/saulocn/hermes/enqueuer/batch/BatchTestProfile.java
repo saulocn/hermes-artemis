@@ -11,8 +11,10 @@ import java.util.Map;
  * connector: no Artemis or RabbitMQ needed here. Broker wiring is covered by the mailer's
  * MailConsumerArtemisIT / MailConsumerRabbitIT.
  *
- * <p>Config lives here rather than in src/test/resources/application.properties because the
- * repo .gitignore excludes **&#47;application.properties.
+ * <p>Config lives in this profile rather than in src/test/resources/application.properties
+ * because the module's versioned application.properties pins quarkus.datasource.jdbc.url
+ * and quarkus.redis.hosts, which switches Dev Services off. A test-resource/profile value
+ * outranks it, so the suite behaves the same whatever a developer has locally.
  */
 public class BatchTestProfile implements QuarkusTestProfile {
 

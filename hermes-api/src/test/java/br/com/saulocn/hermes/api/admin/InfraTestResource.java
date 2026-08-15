@@ -13,11 +13,10 @@ import java.util.Map;
 /**
  * Postgres and Redis for the tests.
  *
- * <p>These are started explicitly instead of relying on Dev Services because the module's
- * application.properties (gitignored, created by each developer) hardcodes
- * quarkus.datasource.jdbc.url and quarkus.redis.hosts, which switches Dev Services off. The
- * values returned here come from a test resource, so they win over application.properties and
- * the suite behaves the same no matter what a developer has locally.
+ * <p>Started explicitly rather than via Dev Services: the module's versioned
+ * application.properties pins quarkus.datasource.jdbc.url and quarkus.redis.hosts, which
+ * switches Dev Services off. A test resource outranks it, so the suite behaves the same
+ * whatever a developer has locally.
  */
 public class InfraTestResource implements QuarkusTestResourceLifecycleManager {
 

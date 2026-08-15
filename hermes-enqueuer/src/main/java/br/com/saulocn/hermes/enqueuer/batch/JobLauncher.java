@@ -1,5 +1,6 @@
 package br.com.saulocn.hermes.enqueuer.batch;
 
+import io.quarkus.scheduler.Scheduled;
 import org.jboss.logging.Logger;
 
 import jakarta.batch.operations.JobOperator;
@@ -21,6 +22,14 @@ import java.util.Properties;
  * <p>Those duplicates are wasteful rather than harmful, since the consumer claims each recipient
  * atomically and drops repeats. But they cost broker and consumer bandwidth exactly when the
  * system is already behind, which is the worst moment to spend it.
+ *
+ * <p>The guard is check-then-act, not atomic: two triggers arriving between the check and the
+ * start still both run. Closing that would take a lock the two paths share — a row in the
+ * database, or the scheduler's own clustered lock. Left open deliberately, because the atomic
+ * claim in the consumer makes the consequence waste rather than incorrectness.
+ *
+ * <p>The schedules live here too. They used to be two classes carrying one annotation each; the
+ * job identity they referenced already lived in this enum.
  */
 @ApplicationScoped
 public class JobLauncher {
@@ -45,6 +54,17 @@ public class JobLauncher {
 
     @Inject
     Logger log;
+
+    @Scheduled(every = "{hermes.enqueuer.interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    void enqueueTick() {
+        startIfIdle(Job.ENQUEUE);
+    }
+
+    // Fixed interval, unlike the enqueue tick: this is a safety net, not a throughput knob.
+    @Scheduled(every = "10m", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    void fallbackTick() {
+        startIfIdle(Job.FALLBACK);
+    }
 
     /**
      * Starts the job unless an execution is already running.
