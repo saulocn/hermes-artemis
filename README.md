@@ -52,9 +52,9 @@ O contador é gravado em transação própria, porque o rollback que devolve a m
 
 Os quatro estados são declarados uma vez, em `RecipientState` (api) e em `RECIPIENT_STATES` (web): o nome na URL, o predicado SQL e o rótulo da tela viajam juntos. Antes eles viviam em oito listas separadas, e foi assim que `failing` entrou no painel como contagem sem existir como filtro — o console mostrava um número que não abria.
 
-**Fluxo.** `br.com.saulocn.hermes.enqueuer.batch.enqueuer.MailEnqueuerJob` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MailConsumer#consume` tira da fila, `MessageService#deliver` reivindica a linha, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
+**Fluxo.** `JobLauncher#enqueueTick()` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MailConsumer#consume` tira da fila, `MessageService#deliver` reivindica a linha, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
 
-**Rede de segurança.** `MailFallbackJob` roda a cada 10 minutos e republica o que continua `sent = false` há mais de 10 minutos. Isso recupera qualquer coisa que se perca entre a publicação e a entrega, ao custo de gerar duplicatas quando o consumo está atrasado — por isso o consumo é idempotente (ver "O que foi corrigido").
+**Rede de segurança.** `JobLauncher#fallbackTick()` roda a cada 10 minutos e republica o que continua `sent = false` há mais de 10 minutos. Isso recupera qualquer coisa que se perca entre a publicação e a entrega, ao custo de gerar duplicatas quando o consumo está atrasado — por isso o consumo é idempotente (ver "O que foi corrigido").
 
 **Retentativas no broker:** 10 tentativas. No Artemis com 2 minutos entre elas (`redelivery-delay`), no RabbitMQ sem espaçamento (não há equivalente para quorum queues).
 
@@ -150,8 +150,8 @@ Classes `*IT` rodam no failsafe (`mvn verify`) porque precisam de Docker; `mvn t
 |-------|-------|
 | `MailConsumerArtemisIT` | consumo via AMQP 1.0 contra Artemis real, no address padrão `jms.queue.MailQueue` |
 | `MailConsumerRabbitIT` | o mesmo contrato contra RabbitMQ 4.x real, em `/queues/MailQueue` |
-| `MailEnqueuerJobIT` | pump DB→fila: publica os não processados e marca `recipient_processed` |
-| `MailFallbackJobIT` | rede de segurança: republica só o que está fora da janela de 10 minutos |
+| `MailEnqueuerJobIT` | `JobLauncher#enqueueTick()`: pump DB→fila, publica os não processados e marca `recipient_processed` |
+| `MailFallbackJobIT` | `JobLauncher#fallbackTick()`: rede de segurança, republica só o que está fora da janela de 10 minutos |
 | `MailWriterAckIT` | invariante central: com o broker recusando a publicação, nenhum destinatário é marcado como processado |
 | `DeliveryFailureIT` | um envio que lança conta a tentativa **e** devolve o claim — sem esperar o timeout de transação |
 | `AdminContractIT` | contrato do console, incluindo `state=failing` listável, estado desconhecido como 400 e reprocessamento zerando o contador |
@@ -380,7 +380,7 @@ O `-XX:+ExitOnOutOfMemoryError` já vinha da imagem base — é por isso que o c
 
 ### Estimativa de volume
 
-- **Tempo até a primeira entrega é cadência, não capacidade**: o `MailEnqueuerJob` roda a cada 30s, então tudo espera ~15s em média mesmo com o sistema vazio. O console permite pular essa espera com o disparo manual.
+- **Tempo até a primeira entrega é cadência, não capacidade**: o job de enfileiramento (via `JobLauncher#enqueueTick()`) roda a cada 30s, então tudo espera ~15s em média mesmo com o sistema vazio. O console permite pular essa espera com o disparo manual.
 - **Número de planejamento conservador: ~1.200 destinatários/s (~4,3 milhões/hora)** na configuração padrão, e **~2.300/s com dois mailers**. Ressalva: medido em janelas de ~70–80s, **não validado em regime de horas** — use o cenário `soak` do k6 para isso.
 - O cap do reader (`hermes.enqueuer.max-recipients-per-run`) dividido pelo intervalo do scheduler é um teto de vazão do *enfileirador*. No default de 100.000 ÷ 30s isso dá ~3.300/s, bem acima do que o consumidor entrega, então **não é mais o limitante** — mas é o número que decide quantas entidades o reader carrega de uma vez, e a 100.000 o enqueuer usa ~690 MiB de 1 GiB.
 
@@ -390,7 +390,7 @@ Um teste de carga acumulou 1,1 milhão de mensagens na fila e expôs o que não 
 
 - **Nada se perde.** Todas ficam no broker; `inFlight` alto significa "publicado, aguardando consumo", não perda. A DLQ ficou zerada o tempo todo.
 - **O consumidor é o gargalo, e ele pode morrer.** O mailer estourou o heap e saiu com exit 3. Ver a seção JVM — os defaults davam 256 MB de heap e SerialGC.
-- **O `MailFallbackJob` gera duplicatas quando o consumo atrasa.** Ele republica tudo com `sent = false` a cada 10 minutos, sem saber que aquilo já está enfileirado: 174 mil cópias em ~68 minutos. Por isso o consumo é idempotente — a duplicata é consumida, reconhecida e descartada sem enviar e-mail. Foram 16.615 descartes observados num único dreno.
+- **O job de fallback (via `JobLauncher#fallbackTick()`) gera duplicatas quando o consumo atrasa.** Ele republica tudo com `sent = false` a cada 10 minutos, sem saber que aquilo já está enfileirado: 174 mil cópias em ~68 minutos. Por isso o consumo é idempotente — a duplicata é consumida, reconhecida e descartada sem enviar e-mail. Foram 16.615 descartes observados num único dreno.
 
 > **Nem o Postgres nem o broker têm volume declarado.** Os dados vivem na camada gravável do container, então **recriar o container perde tudo** — foi assim que 296 mil mensagens enfileiradas sumiram ao ajustar limites de CPU no compose. Para um ambiente de desenvolvimento isso é aceitável e até conveniente (`make down` já limpa de propósito); para qualquer outra coisa, declare volumes.
 
@@ -412,7 +412,7 @@ Sob carga, uma fração das linhas ficava `processed=true, sent=false`. Eram **d
 
 4. **Publicação duplicada por disparo concorrente.** `ConcurrentExecution.SKIP` impede o `@Scheduled` de se sobrepor a si mesmo, mas não sabe do disparo manual pelo console — são caminhos diferentes para o mesmo job. Os dois liam `processed = false` e publicavam: uma execução medida deixou 272.700 mensagens na fila para 200.000 destinatários, ~72 mil publicações duplicadas. Hoje ambos passam por um `JobLauncher` que consulta `getRunningExecutions` antes de iniciar, e o endpoint responde **409** quando recusa, para o console dizer "já em execução" em vez de mostrar falha.
 
-O `MailFallbackJob` continua sendo a rede de segurança para o que escapar, com latência de recuperação de até ~20 minutos (até 10 min para entrar na janela + até 10 min para o próximo tick).
+O job de fallback (via `JobLauncher#fallbackTick()`) continua sendo a rede de segurança para o que escapar, com latência de recuperação de até ~20 minutos (até 10 min para entrar na janela + até 10 min para o próximo tick).
 
 ### Reproduzindo
 

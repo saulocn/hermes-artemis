@@ -38,7 +38,7 @@ class MailWriterAckIT {
 
         // Expected to fail — what matters is the state it leaves behind, so the terminal status
         // itself is not asserted.
-        BatchJobs.runToTerminalStatus("mail-enqueuer-chunk");
+        BatchJobs.runToTerminalStatus(JobLauncher.Job.ENQUEUE);
 
         ids.forEach(id -> assertFalse(fixtures.isProcessed(id),
                 "recipient " + id + " was flagged processed even though the broker refused it"));

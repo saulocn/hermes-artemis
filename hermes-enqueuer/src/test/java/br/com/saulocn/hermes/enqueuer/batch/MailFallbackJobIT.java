@@ -53,7 +53,7 @@ class MailFallbackJobIT {
         List<Long> fresh = fixtures.createRecipients(message.getId(), 2, true, false,
                 LocalDateTime.now());
 
-        BatchJobs.runToCompletion("mail-fallback-chunk");
+        BatchJobs.runToCompletion(JobLauncher.Job.FALLBACK);
 
         Set<Long> published = sink.received().stream()
                 .map(m -> RecipientVO.fromJSON(m.getPayload()).getId())

@@ -14,22 +14,23 @@ import java.util.OptionalLong;
 import java.util.Properties;
 
 /**
- * Single entry point for starting the batch jobs, so a run cannot overlap itself.
+ * Where every batch start goes through, so that overlapping runs are refused in one place.
+ *
+ * <p>Deliberately not "so a run cannot overlap itself" — it cannot promise that, and the two
+ * paragraphs below say why. What it does give is a single place holding the rule, instead of the
+ * scheduler and the REST endpoint each starting jobs on their own.
  *
  * <p>There are two ways to launch: the {@code @Scheduled} tick and the REST endpoint the console
  * calls. {@code ConcurrentExecution.SKIP} guards the scheduler against itself but knows nothing
- * about the manual trigger, so the two could run at once — and they do overlap in practice: both
+ * about the manual trigger, so the two could run at once — and they did overlap in practice: both
  * read the same {@code processed = false} rows and publish them. A measured run produced 272,700
  * queued messages for 200,000 recipients, roughly 72,000 duplicate publishes.
  *
- * <p>Those duplicates are wasteful rather than harmful, since the consumer claims each recipient
- * atomically and drops repeats. But they cost broker and consumer bandwidth exactly when the
- * system is already behind, which is the worst moment to spend it.
- *
- * <p>The guard is check-then-act, not atomic: two triggers arriving between the check and the
- * start still both run. Closing that would take a lock the two paths share — a row in the
+ * <p>The remaining hole is that the check and the start are two steps: two triggers arriving in
+ * between still both run. Closing it would take a lock the two paths share — a row in the
  * database, or the scheduler's own clustered lock. Left open deliberately, because the atomic
- * claim in the consumer makes the consequence waste rather than incorrectness.
+ * claim in the consumer makes the consequence waste rather than incorrectness. If duplicate
+ * publishing shows up in a load run again, that lock is the fix, not a wider guard here.
  *
  * <p>The schedules live here too. They used to be two classes carrying one annotation each; the
  * job identity they referenced already lived in this enum.

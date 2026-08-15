@@ -45,7 +45,7 @@ class MailEnqueuerJobIT {
         Message message = fixtures.createMessage();
         List<Long> ids = fixtures.createRecipients(message.getId(), 3, false, false, LocalDateTime.now());
 
-        BatchJobs.runToCompletion("mail-enqueuer-chunk");
+        BatchJobs.runToCompletion(JobLauncher.Job.ENQUEUE);
 
         Set<Long> published = sink.received().stream()
                 .map(m -> RecipientVO.fromJSON(m.getPayload()).getId())
