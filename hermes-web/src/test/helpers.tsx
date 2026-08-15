@@ -35,12 +35,21 @@ export function jsonResponse(
  * Install a fetch mock that routes requests by URL substring matching.
  * If no route matches, throws an Error naming the unexpected URL.
  */
-export function mockFetchRoutes(routes: Record<string, unknown>) {
+/** A route may answer with a plain body, or with a body and a status. */
+export type RouteResponse = unknown | { body: unknown; status: number };
+
+function isStatusRoute(value: unknown): value is { body: unknown; status: number } {
+  return typeof value === 'object' && value !== null && 'status' in value && 'body' in value;
+}
+
+export function mockFetchRoutes(routes: Record<string, RouteResponse>) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    for (const [key, body] of Object.entries(routes)) {
+    for (const [key, response] of Object.entries(routes)) {
       if (url.includes(key)) {
-        return jsonResponse(body);
+        return isStatusRoute(response)
+          ? jsonResponse(response.body, { status: response.status })
+          : jsonResponse(response);
       }
     }
     throw new Error(`unexpected url: ${url}`);

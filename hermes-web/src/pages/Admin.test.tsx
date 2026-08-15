@@ -41,6 +41,27 @@ describe('Admin page', () => {
     );
   });
 
+  it('states plainly that a job is already running instead of showing a failure', async () => {
+    // The server answers 409 when a run is in flight. This used to reach the operator as a red
+    // banner containing the raw JSON body — the intent to say "already running" was written in
+    // three Java comments and never realised on screen.
+    const user = userEvent.setup();
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/recipients': recipientsPage,
+      '/api/admin/jobs/enqueue': { body: { error: 'job already running' }, status: 409 },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Admin />);
+    await user.click(screen.getByRole('button', { name: 'Disparar enfileiramento' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/já está em execução/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/status 409/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Execution id/)).not.toBeInTheDocument();
+  });
+
   it('triggers enqueue job and shows execution id banner', async () => {
     const user = userEvent.setup();
     const fetchMock = mockFetchRoutes({

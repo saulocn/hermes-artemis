@@ -8,8 +8,7 @@ import {
   getRecipients,
   getThroughput,
   retryRecipient,
-  triggerEnqueueJob,
-  triggerFallbackJob,
+  triggerJob,
 } from './client';
 
 function jsonResponse(body: unknown, init: { status?: number; ok?: boolean } = {}) {
@@ -124,12 +123,12 @@ describe('api/client', () => {
     expect(result).toEqual({ id: 7, retried: true });
   });
 
-  it('triggerEnqueueJob and triggerFallbackJob post and return executionId', async () => {
+  it('triggerJob posts to the job path and reports the execution id', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ executionId: 42 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await triggerEnqueueJob()).toEqual({ executionId: 42 });
-    expect(await triggerFallbackJob()).toEqual({ executionId: 42 });
+    expect(await triggerJob('enqueue')).toEqual({ started: true, executionId: 42 });
+    expect(await triggerJob('fallback')).toEqual({ started: true, executionId: 42 });
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       '/api/admin/jobs/enqueue',
@@ -140,6 +139,23 @@ describe('api/client', () => {
       '/api/admin/jobs/fallback',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('reports a 409 as a refused trigger rather than throwing', async () => {
+    // The server answers 409 when a run is already in flight. That is an outcome the screen
+    // should state plainly, not an ApiError it renders as a failure.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'job already running' }, { status: 409 })),
+    );
+
+    expect(await triggerJob('enqueue')).toEqual({ started: false, reason: 'already-running' });
+  });
+
+  it('still throws for other job failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, { status: 500 })));
+
+    await expect(triggerJob('enqueue')).rejects.toBeInstanceOf(ApiError);
   });
 
   it('throws an ApiError carrying the status on a non-2xx response', async () => {

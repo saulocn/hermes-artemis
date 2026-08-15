@@ -3,8 +3,7 @@ import {
   ApiError,
   getRecipients,
   retryRecipient,
-  triggerEnqueueJob,
-  triggerFallbackJob,
+  triggerJob,
   type Recipient,
   type RecipientState,
 } from '../api/client';
@@ -38,17 +37,23 @@ function recipientState(recipient: Recipient): RecipientState {
 function JobsPanel() {
   const [busyJob, setBusyJob] = useState<'enqueue' | 'fallback' | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  // Separate from `error`: a refused trigger is information, not a failure.
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function trigger(kind: 'enqueue' | 'fallback') {
     setBusyJob(kind);
     setError(null);
     setResult(null);
+    setNotice(null);
+    const label = kind === 'enqueue' ? 'enfileiramento' : 'fallback';
     try {
-      const response = kind === 'enqueue' ? await triggerEnqueueJob() : await triggerFallbackJob();
-      setResult(
-        `Job de ${kind === 'enqueue' ? 'enfileiramento' : 'fallback'} disparado. Execution id: ${response.executionId}`,
-      );
+      const outcome = await triggerJob(kind);
+      if (outcome.started) {
+        setResult(`Job de ${label} disparado. Execution id: ${outcome.executionId}`);
+      } else {
+        setNotice(`O job de ${label} já está em execução. Nada foi disparado.`);
+      }
     } catch (err) {
       setError(describeError(err));
     } finally {
@@ -62,6 +67,7 @@ function JobsPanel() {
         <h2>Jobs</h2>
       </div>
       {error && <div className="error-banner">{error}</div>}
+      {notice && <div className="notice-banner">{notice}</div>}
       {result && <div className="success-banner">{result}</div>}
       <div className="job-buttons">
         <button disabled={busyJob !== null} onClick={() => trigger('enqueue')}>

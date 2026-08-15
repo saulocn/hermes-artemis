@@ -171,10 +171,28 @@ export interface JobTriggerResponse {
   executionId: number;
 }
 
-export function triggerEnqueueJob(): Promise<JobTriggerResponse> {
-  return request<JobTriggerResponse>('/admin/jobs/enqueue', { method: 'POST' });
-}
+/** The two jobs, named once. The server derives its own paths from the same two words. */
+export type JobName = 'enqueue' | 'fallback';
 
-export function triggerFallbackJob(): Promise<JobTriggerResponse> {
-  return request<JobTriggerResponse>('/admin/jobs/fallback', { method: 'POST' });
+/**
+ * A refused trigger is an outcome, not a failure.
+ *
+ * The server answers 409 when a run of the same job is already in flight. Letting that surface
+ * as a thrown ApiError put a red banner with a raw JSON body in front of the operator, which is
+ * the opposite of what a "someone already started it" answer should look like.
+ */
+export type JobTriggerResult =
+  | { started: true; executionId: number }
+  | { started: false; reason: 'already-running' };
+
+export async function triggerJob(job: JobName): Promise<JobTriggerResult> {
+  try {
+    const response = await request<JobTriggerResponse>(`/admin/jobs/${job}`, { method: 'POST' });
+    return { started: true, executionId: response.executionId };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      return { started: false, reason: 'already-running' };
+    }
+    throw error;
+  }
 }

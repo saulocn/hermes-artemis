@@ -7,6 +7,9 @@ import jakarta.batch.operations.JobOperator;
 import jakarta.batch.runtime.BatchRuntime;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Properties;
 
@@ -34,21 +37,42 @@ import java.util.Properties;
 @ApplicationScoped
 public class JobLauncher {
 
-    /** The job name passed to start() is the XML file name; getRunningExecutions() wants the id declared inside it. */
+    /**
+     * The three names a job answers to, in one place.
+     *
+     * <p>{@code path} is what appears in the URL, {@code fileName} is what start() takes, and
+     * {@code jobId} is what getRunningExecutions() wants — JBeret uses the XML file name for one
+     * and the id declared inside it for the other. Keeping them together is what stops a fourth
+     * copy appearing as a string map somewhere else.
+     */
     public enum Job {
-        ENQUEUE("mail-enqueuer-chunk", "mailEnqueuer"),
-        FALLBACK("mail-fallback-chunk", "mailFallbackEnqueuer");
+        ENQUEUE("enqueue", "mail-enqueuer-chunk", "mailEnqueuer"),
+        FALLBACK("fallback", "mail-fallback-chunk", "mailFallbackEnqueuer");
 
+        private final String path;
         private final String fileName;
         private final String jobId;
 
-        Job(String fileName, String jobId) {
+        Job(String path, String fileName, String jobId) {
+            this.path = path;
             this.fileName = fileName;
             this.jobId = jobId;
         }
 
+        public String path() {
+            return path;
+        }
+
         public String fileName() {
             return fileName;
+        }
+
+        public static Optional<Job> fromPath(String path) {
+            return Arrays.stream(values()).filter(j -> j.path.equals(path)).findFirst();
+        }
+
+        public static List<String> paths() {
+            return Arrays.stream(values()).map(Job::path).toList();
         }
     }
 
@@ -82,6 +106,20 @@ public class JobLauncher {
         long executionId = jobOperator.start(job.fileName(), new Properties());
         log.infof("Job %s started, execution %d", job.fileName(), executionId);
         return OptionalLong.of(executionId);
+    }
+
+    /** Empty when there is no such execution. */
+    public Optional<Execution> statusOf(long executionId) {
+        try {
+            var execution = BatchRuntime.getJobOperator().getJobExecution(executionId);
+            return Optional.of(new Execution(executionId, execution.getJobName(),
+                    execution.getBatchStatus().name()));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    public record Execution(long executionId, String jobName, String status) {
     }
 
     private java.util.List<Long> runningExecutions(JobOperator jobOperator, Job job) {
