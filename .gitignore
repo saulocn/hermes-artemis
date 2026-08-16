@@ -3,3 +3,11 @@ package-lock.json
 
 target/
 **/target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
