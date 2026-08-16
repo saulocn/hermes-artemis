@@ -12,9 +12,9 @@ import java.util.Map;
  * MailConsumerArtemisIT / MailConsumerRabbitIT.
  *
  * <p>Config lives in this profile rather than in src/test/resources/application.properties
- * because the module's versioned application.properties pins quarkus.datasource.jdbc.url
- * and quarkus.redis.hosts, which switches Dev Services off. A test-resource/profile value
- * outranks it, so the suite behaves the same whatever a developer has locally.
+ * because the module's versioned application.properties pins quarkus.datasource.jdbc.url,
+ * which switches Dev Services off. A test-resource/profile value outranks it, so the suite
+ * behaves the same whatever a developer has locally.
  */
 public class BatchTestProfile implements QuarkusTestProfile {
 

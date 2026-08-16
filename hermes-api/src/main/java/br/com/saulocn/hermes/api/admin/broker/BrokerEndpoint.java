@@ -5,8 +5,17 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/** Where the broker's management interface is, and how to authenticate to it. */
-public record BrokerEndpoint(String host, int port, String username, String password) {
+import java.util.Optional;
+
+/**
+ * Where the broker's management interface is, how to authenticate to it, and the main queue name
+ * it reports on.
+ *
+ * <p>The queue name is configurable to match the {@code MQ_MAIL_ADDRESS} environment variable used
+ * by the enqueuer and mailer. Each broker adapter falls back to its own default when the config
+ * property is blank: Artemis defaults to {@code jms.queue.MailQueue}, RabbitMQ to {@code MailQueue}.
+ */
+public record BrokerEndpoint(String host, int port, String username, String password, String queue) {
 
     public String baseUrl() {
         return "http://" + host + ":" + port;
@@ -27,8 +36,9 @@ public record BrokerEndpoint(String host, int port, String username, String pass
                 @ConfigProperty(name = "hermes.broker.host", defaultValue = "localhost") String host,
                 @ConfigProperty(name = "hermes.broker.management-port", defaultValue = "8161") int port,
                 @ConfigProperty(name = "hermes.broker.username", defaultValue = "hermes") String username,
-                @ConfigProperty(name = "hermes.broker.password", defaultValue = "pass_hermes") String password) {
-            return new BrokerEndpoint(host, port, username, password);
+                @ConfigProperty(name = "hermes.broker.password", defaultValue = "pass_hermes") String password,
+                @ConfigProperty(name = "hermes.broker.queue") Optional<String> queue) {
+            return new BrokerEndpoint(host, port, username, password, queue.orElse(""));
         }
     }
 }

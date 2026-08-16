@@ -5,9 +5,6 @@ import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(schema = "hermes", name = "message")

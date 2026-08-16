@@ -56,7 +56,11 @@ public class JobTriggerService {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("could not reach the enqueuer at " + enqueuerUrl, e);
+            // Connection refused, DNS failure, timeout: the enqueuer is down or misconfigured.
+            // Its own type, because the console has to tell it apart from "the job is running" —
+            // as a plain IllegalStateException this reached the operator as a raw 500 with a
+            // stack trace, which says nothing about which of the two services is unwell.
+            throw new EnqueuerUnreachableException(enqueuerUrl, e);
         }
     }
 
@@ -64,6 +68,13 @@ public class JobTriggerService {
     public static class JobAlreadyRunningException extends RuntimeException {
         public JobAlreadyRunningException(String job) {
             super("job already running: " + job);
+        }
+    }
+
+    /** The enqueuer could not be reached at all, so nothing was triggered and nothing is running. */
+    public static class EnqueuerUnreachableException extends RuntimeException {
+        public EnqueuerUnreachableException(String url, Throwable cause) {
+            super("could not reach the enqueuer at " + url, cause);
         }
     }
 }

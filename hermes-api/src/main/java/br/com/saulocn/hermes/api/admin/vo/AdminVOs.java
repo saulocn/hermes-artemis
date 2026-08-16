@@ -16,10 +16,11 @@ public final class AdminVOs {
     /**
      * What the recipient table looks like right now.
      *
-     * <p>{@code pending}, {@code inFlight} and {@code delivered} come from the two booleans.
-     * {@code failing} is a subset of {@code inFlight}: published, undelivered, and known to have
-     * thrown at least once. Without it a message stuck in a retry loop and a message merely
-     * waiting in a queue are the same number.
+     * <p>The four states partition every row: a recipient is in exactly one of
+     * {@code pending}, {@code inFlight}, {@code failing}, or {@code delivered}.
+     * {@code inFlight} are published, undelivered, with no attempt failures. {@code failing} are
+     * published, undelivered, and known to have thrown at least once. The four counts always sum to
+     * the table size.
      */
     public record Stats(long pending, long inFlight, long failing, long delivered,
                         long totalMessages, Long oldestPendingSeconds) {

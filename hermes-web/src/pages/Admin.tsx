@@ -27,8 +27,7 @@ function formatDate(iso: string): string {
   return date.toLocaleString('pt-BR');
 }
 
-// Same reading the server does in RecipientState, in the same order: `failing` is a subset of
-// `inFlight`, so it has to be tested first or it can never be reached.
+// Same reading the server does in RecipientState: the four states partition every row.
 function recipientState(recipient: Recipient): RecipientState {
   if (recipient.sent) return 'delivered';
   if (recipient.processed) return recipient.attempts > 0 ? 'failing' : 'inFlight';

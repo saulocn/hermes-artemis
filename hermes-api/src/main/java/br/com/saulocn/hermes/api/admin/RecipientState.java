@@ -20,9 +20,9 @@ public enum RecipientState {
 
     PENDING("pending", "not recipient_processed and not recipient_sent"),
 
-    IN_FLIGHT("inFlight", "recipient_processed and not recipient_sent"),
+    IN_FLIGHT("inFlight", "recipient_processed and not recipient_sent and recipient_attempts = 0"),
 
-    /** A subset of IN_FLIGHT: published, undelivered, and known to have thrown at least once. */
+    /** Published, undelivered, and known to have thrown at least once. */
     FAILING("failing", "recipient_processed and not recipient_sent and recipient_attempts > 0"),
 
     DELIVERED("delivered", "recipient_sent");

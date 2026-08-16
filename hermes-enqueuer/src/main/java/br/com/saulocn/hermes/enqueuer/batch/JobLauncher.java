@@ -39,12 +39,14 @@ import java.util.Properties;
 public class JobLauncher {
 
     /**
-     * The three names a job answers to, in one place.
+     * The three names a job answers to, in one place *within this module*.
      *
      * <p>{@code path} is what appears in the URL, {@code fileName} is what start() takes, and
      * {@code jobId} is what getRunningExecutions() wants — JBeret uses the XML file name for one
-     * and the id declared inside it for the other. Keeping them together is what stops a fourth
-     * copy appearing as a string map somewhere else.
+     * and the id declared inside it for the other. Keeping them together stops duplication here;
+     * however, a fourth copy exists outside this module: {@code hermes-api} hardcodes "enqueue"
+     * and "fallback" in both {@code @Path} and as method arguments in {@code AdminResource}, across
+     * a module boundary this enum cannot reach.
      */
     public enum Job {
         ENQUEUE("enqueue", "mail-enqueuer-chunk", "mailEnqueuer"),

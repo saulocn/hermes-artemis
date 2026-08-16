@@ -416,6 +416,7 @@ describe('Admin page', () => {
           messageId: 1,
           processed: true,
           sent: true,
+          attempts: 0,
           createdAt: '2026-08-14T10:00:00Z',
         },
       ],
@@ -437,7 +438,7 @@ describe('Admin page', () => {
     expect(badge.textContent).toBe('Entregue');
   });
 
-  it('shows badge as Em trânsito when processed=true but sent=false', async () => {
+  it('shows badge as Em trânsito when processed=true but sent=false and attempts=0', async () => {
     const inFlightData = {
       page: 0,
       size: 20,
@@ -449,6 +450,7 @@ describe('Admin page', () => {
           messageId: 1,
           processed: true,
           sent: false,
+          attempts: 0,
           createdAt: '2026-08-14T10:00:00Z',
         },
       ],
@@ -482,6 +484,7 @@ describe('Admin page', () => {
           messageId: 1,
           processed: false,
           sent: false,
+          attempts: 0,
           createdAt: '2026-08-14T10:00:00Z',
         },
       ],
@@ -501,5 +504,39 @@ describe('Admin page', () => {
     // Verify badge is rendered with status role
     const badge = screen.getByRole('status');
     expect(badge.textContent).toBe('Pendente');
+  });
+
+  it('shows badge as Falhando when processed=true, sent=false, and attempts>0', async () => {
+    const failingData = {
+      page: 0,
+      size: 20,
+      total: 1,
+      items: [
+        {
+          id: 1,
+          email: 'failing@example.com',
+          messageId: 1,
+          processed: true,
+          sent: false,
+          attempts: 3,
+          createdAt: '2026-08-14T10:00:00Z',
+        },
+      ],
+    };
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/recipients': failingData,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Admin />);
+
+    // Wait for the email to appear
+    await waitFor(() => {
+      expect(screen.getByText('failing@example.com')).toBeInTheDocument();
+    });
+
+    // Verify badge is rendered with status role and shows the attempt count
+    const badge = screen.getByRole('status');
+    expect(badge.textContent).toBe('Falhando (3)');
   });
 });

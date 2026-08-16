@@ -37,8 +37,8 @@ public class DashboardService {
                 from hermes.recipient
                 """.formatted(RecipientState.countColumns())).getSingleResult();
 
-        // Keyed, not positional: the counts arrive in enum order, and reordering the enum used to
-        // silently swap two longs of the same type past a test that only asserts non-null.
+        // Positional array from countColumns() emits in enum order; EnumMap re-keys by state. Safety
+        // comes from both sides using the same order (enum.values()).
         Map<RecipientState, Long> counts = new EnumMap<>(RecipientState.class);
         RecipientState[] states = RecipientState.values();
         for (int i = 0; i < states.length; i++) {

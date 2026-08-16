@@ -10,8 +10,8 @@ import java.util.Objects;
 @Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
-    public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
-    public static final String FIND_NOT_SENT_MINUTES = "Message.FindNotSentMinutes";
+    public static final String FIND_NOT_PROCESSED = "Recipient.FindNotProcessed";
+    public static final String FIND_NOT_SENT_MINUTES = "Recipient.FindNotSentMinutes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
@@ -46,7 +46,8 @@ public class Recipient {
     @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
     private int attempts;
 
-    @Column(name = "created_on", columnDefinition = "timestamp not null default now()")
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
 
@@ -112,10 +113,6 @@ public class Recipient {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
     }
 
     @Override

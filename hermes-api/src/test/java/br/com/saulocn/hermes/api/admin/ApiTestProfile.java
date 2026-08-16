@@ -22,6 +22,7 @@ public class ApiTestProfile implements QuarkusTestProfile {
         config.put("quarkus.http.test-port", "0");
         config.put("hermes.broker.host", "127.0.0.1");
         config.put("hermes.broker.management-port", "1");
+        config.put("hermes.broker.queue", "");
         config.put("hermes.enqueuer.url", "http://127.0.0.1:1");
         return config;
     }

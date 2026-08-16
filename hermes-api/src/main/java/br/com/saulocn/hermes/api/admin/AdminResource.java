@@ -98,6 +98,15 @@ public class AdminResource {
             // should say "already running" rather than show a failure banner.
             return Response.status(Response.Status.CONFLICT)
                     .entity(java.util.Map.of("error", e.getMessage())).build();
+        } catch (JobTriggerService.EnqueuerUnreachableException e) {
+            // 502, not 500: nothing here failed. This api is fine and the operator's request was
+            // fine — the service behind it did not answer. Left as an unhandled exception it
+            // reached the console as a raw stack trace, which points the operator at the wrong
+            // service. Also says plainly that nothing was started, so a retry is safe.
+            return Response.status(Response.Status.BAD_GATEWAY)
+                    .entity(java.util.Map.of(
+                            "error", e.getMessage(),
+                            "started", false)).build();
         }
     }
 }

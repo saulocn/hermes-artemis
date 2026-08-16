@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class BrokerAdminTest {
 
-    private static final BrokerEndpoint ENDPOINT = new BrokerEndpoint("broker.test", 15672, "u", "p");
+    private static final BrokerEndpoint ENDPOINT = new BrokerEndpoint("broker.test", 15672, "u", "p", "");
 
     /** Answers canned JSON per URL substring, and records what it was asked for. */
     private static final class StubHttp extends BrokerHttp {
@@ -63,6 +63,40 @@ class BrokerAdminTest {
 
         assertEquals(42L, depth.main());
         assertEquals(7L, depth.dlq());
+    }
+
+    @Test
+    void rabbitUsesConfiguredQueueName() throws Exception {
+        BrokerEndpoint customEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "CustomMail");
+        StubHttp http = new StubHttp()
+                .on("/api/queues/%2F/CustomMailDLQ", "{\"messages\": 3}")
+                .on("/api/queues/%2F/CustomMail", "{\"messages\": 99}");
+
+        QueueDepth depth = new RabbitBrokerAdmin(http, customEndpoint).read();
+
+        assertEquals(99L, depth.main());
+        assertEquals(3L, depth.dlq());
+        // Verify correct queue names were requested
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("CustomMail")),
+                "should request the custom main queue");
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("CustomMailDLQ")),
+                "should request the custom DLQ");
+    }
+
+    @Test
+    void rabbitFallsBackToDefaultWhenQueueNameIsBlank() throws Exception {
+        BrokerEndpoint blankEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "");
+        StubHttp http = new StubHttp()
+                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 7}")
+                .on("/api/queues/%2F/MailQueue", "{\"messages\": 42}");
+
+        QueueDepth depth = new RabbitBrokerAdmin(http, blankEndpoint).read();
+
+        assertEquals(42L, depth.main());
+        assertEquals(7L, depth.dlq());
+        // Verify default queue names were used
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("MailQueue")),
+                "should use default MailQueue when blank");
     }
 
     @Test
@@ -125,5 +159,42 @@ class BrokerAdminTest {
 
         assertEquals(5L, depth.main());
         assertEquals(0L, depth.dlq());
+    }
+
+    @Test
+    void artemisUsesConfiguredQueueName() throws Exception {
+        BrokerEndpoint customEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "jms.queue.CustomMail");
+        StubHttp http = new StubHttp()
+                .on("jms.queue.CustomMailDLQ", "{\"value\": []}")
+                .on("jms.queue.CustomMail", "{\"value\": [\"org.apache.activemq.artemis:broker=\\\"0.0.0.0\\\"\"]}")
+                .on("/console/jolokia/search/", "{\"value\": [\"mbean\"]}")
+                .on("/console/jolokia/read/", "{\"value\": 42}");
+
+        QueueDepth depth = new ArtemisBrokerAdmin(http, customEndpoint).read();
+
+        assertEquals(42L, depth.main());
+        assertEquals(0L, depth.dlq());
+        // Verify custom queue names were used in the search patterns
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("jms.queue.CustomMail")),
+                "should request the custom main queue");
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("jms.queue.CustomMailDLQ")),
+                "should request the custom DLQ");
+    }
+
+    @Test
+    void artemisFallsBackToDefaultWhenQueueNameIsBlank() throws Exception {
+        BrokerEndpoint blankEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "");
+        StubHttp http = new StubHttp()
+                .on("jms.queue.MailQueueDLQ", "{\"value\": []}")
+                .on("/console/jolokia/search/", "{\"value\": [\"mbean\"]}")
+                .on("/console/jolokia/read/", "{\"value\": 13}");
+
+        QueueDepth depth = new ArtemisBrokerAdmin(http, blankEndpoint).read();
+
+        assertEquals(13L, depth.main());
+        assertEquals(0L, depth.dlq());
+        // Verify default queue names were used
+        assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("jms.queue.MailQueue")),
+                "should use default jms.queue.MailQueue when blank");
     }
 }

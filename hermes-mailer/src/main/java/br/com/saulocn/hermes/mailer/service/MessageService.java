@@ -36,6 +36,27 @@ public class MessageService {
      * <p>Everything this touches rolls back together when the send throws, which is what puts the
      * message back on the queue. Nothing that must <em>survive</em> that rollback belongs in
      * here — see {@link MailConsumer} for where the failure counter goes and why.
+     *
+     * <h2>Why the SMTP call is inside the transaction</h2>
+     *
+     * <p>It looks wrong — a network call to a third party holding a database connection — and the
+     * obvious rewrite is to commit the claim first and send afterwards. That rewrite trades this
+     * system's stated priority away. Committing first means a crash between the commit and the
+     * send leaves the row reading {@code sent = true} with no mail ever sent: the fallback job
+     * only republishes rows that are still unsent, so nothing would ever notice. Silent loss.
+     *
+     * <p>Keeping the send inside means a crash rolls the claim back with the connection, the
+     * broker redelivers, and the worst case is a second mail to someone who may already have
+     * received one. This system has already chosen that direction everywhere else — the fallback
+     * job deliberately republishes, and the claim exists to absorb the duplicates it creates.
+     *
+     * <p>What remains is a genuine dual write: if SMTP accepts the mail and the commit then fails,
+     * the mail is out and the claim is not, so the redelivery sends a second copy. That window
+     * cannot be closed without a transactional mail server or an outbox with a send-state column.
+     * It can only be made rare, which is a matter of configuration: the transaction timeout has to
+     * comfortably exceed the slowest send, or the timeout <em>itself</em> becomes the thing that
+     * manufactures duplicates. See the timeout and pool settings in application.properties, which
+     * are sized against each other for exactly this reason.
      */
     @Transactional
     public void deliver(RecipientVO recipientVO) {

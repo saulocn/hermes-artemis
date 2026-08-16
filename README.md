@@ -38,19 +38,22 @@ flowchart LR
     class MAIL,U,OP ext
 ```
 
-O estado de cada destinatário vive em dois booleanos na tabela `hermes.recipient`, e é deles que saem os três estados que o console mostra:
+O estado de cada destinatário sai de dois booleanos e um contador na tabela `hermes.recipient`. São quatro estados, e eles **particionam** a tabela: toda linha está em exatamente um, e as quatro contagens do painel somam o total.
 
-| Estado | `processed` | `sent` | Significado |
-|---|---|---|---|
-| Pendente | `false` | `false` | Ainda não publicado no broker |
-| Em trânsito | `true` | `false` | Publicado, aguardando consumo |
-| Entregue | `true` | `true` | E-mail enviado |
+| Estado | `processed` | `sent` | `attempts` | Significado |
+|---|---|---|---|---|
+| Pendente | `false` | `false` | — | Ainda não publicado no broker |
+| Em trânsito | `true` | `false` | `= 0` | Publicado, aguardando consumo |
+| Falhando | `true` | `false` | `> 0` | Publicado, e algum envio já lançou |
+| Entregue | `true` | `true` | — | E-mail enviado |
 
-Há um quarto, que é um subconjunto de "em trânsito": **falhando**, quando `recipient_attempts > 0`. Um envio que lança faz rollback do claim e a linha volta a `processed=true, sent=false` — exatamente o que uma mensagem só aguardando na fila parece. Sem o contador, uma mensagem presa em retentativa e uma apenas enfileirada eram o mesmo número no painel, para sempre.
+"Falhando" existe porque um envio que lança faz rollback do claim e a linha volta a `processed=true, sent=false` — exatamente o que uma mensagem só aguardando na fila parece. Sem o contador, uma mensagem presa em retentativa e uma apenas enfileirada eram o mesmo número no painel, para sempre.
 
 O contador é gravado em transação própria, porque o rollback que devolve a mensagem à fila desfaria qualquer coisa escrita na transação da entrega — e **fora** dela, depois que o rollback já soltou o lock da linha. Uma transação nova atualizando a linha que a transação suspensa ainda trava espera por um lock que só a própria thread pode liberar; o Postgres não vê ciclo, porque um dos lados é código de aplicação. É por isso que o consumidor (`MailConsumer`) e a entrega (`MessageService#deliver`) são módulos separados: a ordem "entrega commita ou aborta, depois conta" é o que essa separação expressa. Quem reprocessa pelo console zera o contador junto, porque as falhas antigas deixaram de descrever a linha.
 
-Os quatro estados são declarados uma vez, em `RecipientState` (api) e em `RECIPIENT_STATES` (web): o nome na URL, o predicado SQL e o rótulo da tela viajam juntos. Antes eles viviam em oito listas separadas, e foi assim que `failing` entrou no painel como contagem sem existir como filtro — o console mostrava um número que não abria.
+Do lado da api, os quatro estados vivem em `RecipientState`: o nome na URL e o predicado SQL viajam juntos, e a query de contagem e a de filtro derivam os dois do enum. Foi a falta disso que deixou `failing` entrar no painel como contagem sem existir como filtro — o console mostrava um número que não abria.
+
+Isso não é "declarado uma vez". O console repete a lista em `RECIPIENT_STATES` (nome + rótulo) e **reimplementa o predicado** em `Admin.tsx#recipientState`, para decidir o badge de cada linha sem uma segunda ida ao servidor. Somando o record `Stats`, a chamada posicional que o constrói e os cards do painel, um quinto estado ainda toca sete lugares em duas linguagens. O que o enum resolveu foi a api discordar de si mesma.
 
 **Fluxo.** `JobLauncher#enqueueTick()` roda a cada 30s (configurável), lê os destinatários com `processed = false` e publica cada um. `br.com.saulocn.hermes.mailer.service.MailConsumer#consume` tira da fila, `MessageService#deliver` reivindica a linha, envia e marca `sent = true`. Uma falha no envio devolve a mensagem à fila para nova tentativa.
 
@@ -140,8 +143,10 @@ A aplicação se comunica via AMQP 1.0 com ambos os brokers (RabbitMQ 4.x suport
 ## Testes
 
 ```
-cd hermes-mailer && ./mvnw verify     # ITs de broker
+cd hermes-api && ./mvnw verify        # ITs do admin e do message
 cd hermes-enqueuer && ./mvnw verify   # ITs de batch
+cd hermes-mailer && ./mvnw verify     # ITs de broker
+make test                             # Tudo acima, mais testes web (vitest)
 ```
 
 Classes `*IT` rodam no failsafe (`mvn verify`) porque precisam de Docker; `mvn test` continua rápido e sem Docker.
@@ -159,7 +164,7 @@ Classes `*IT` rodam no failsafe (`mvn verify`) porque precisam de Docker; `mvn t
 
 Os dois ITs de broker herdam de `AbstractMailConsumerIT` e sobem o container com o **mesmo** `artemis/broker.xml` / `rabbit/definitions.json` que o compose usa — é isso que trava a paridade de comportamento entre os brokers. Os testes de batch usam o connector in-memory do SmallRye e não precisam de broker.
 
-O `DeliveryFailureIT` também usa o connector in-memory: o que ele verifica é a ordem entre a transação de entrega e o contador de falha, e AMQP não participa disso. O banco é real, porque o lock de linha é justamente o assunto. O orçamento de 10s do teste não é medida de performance — contar a falha de dentro da transação de entrega leva no mínimo os 30s do timeout configurado, então nenhuma máquina rápida faz esse teste passar por acaso.
+O `DeliveryFailureIT` também usa o connector in-memory: o que ele verifica é a ordem entre a transação de entrega e o contador de falha, e AMQP não participa disso. O orçamento de 10s do teste não é medida de performance — a segunda transação falha ao adquirir conexão do pool (timeout de 5s do Agroal em um pool de size 2), então o teste é determinístico, não uma corrida. A primeira transação segura uma conexão enquanto a segunda espera por outra, o que faz o erro acontecer sistematicamente antes do timeout de transação de 30s (a produção é 2s).
 
 ## Inicializando serviços individualmente
 
@@ -233,11 +238,7 @@ A tela fica em **http://localhost:8090** e sobe junto com qualquer um dos dois p
 | Histórico | Mensagens paginadas com busca e progresso de entrega por mensagem |
 | Admin | Dispara os jobs de enqueue e fallback na hora, e reprocessa destinatário individual |
 
-Os três estados que a tela mostra vêm dos dois booleanos que o schema carrega:
-
-- **pendente** — `processed=false, sent=false`: ainda não publicado no broker.
-- **em voo** — `processed=true, sent=false`: publicado, ainda não entregue.
-- **entregue** — `sent=true`.
+Os estados que a tela mostra vêm dos dois booleanos `processed` e `sent` na tabela `recipient`, conforme a tabela na seção "Fluxo" — **pendente**, **em trânsito**, **falhando** (subconjunto de em trânsito, com `recipient_attempts > 0`) e **entregue**.
 
 > **Sem autenticação.** A tela expõe operações administrativas (disparo de job, reprocessamento) sem nenhuma barreira. Não publique fora de rede confiável.
 
@@ -264,6 +265,8 @@ O `hermes-enqueuer` expõe `POST /jobs/{enqueue,fallback}` e `GET /jobs/{executi
 ## Capacidade
 
 Números medidos **com os limites de recurso do `docker-compose.yml` aplicados** (confirmados via `docker inspect`), com `MAIL_MOCK=true` — medem API → Postgres → enqueuer → broker → mailer, e **não** o SMTP real.
+
+> **Estes números estão defasados e precisam ser refeitos.** Eles foram medidos com `jdbc.max-size=2` e 30 workers — com envio mockado, um envio custa microssegundos e o pool de 2 era o limitante real, o que por acaso dava ~1.450/s. Esse arranjo foi corrigido (ver "SMTP e transação" abaixo): pool e workers agora são o mesmo `MAIL_WORKERS`, default 10. Rode `make bench` de novo antes de citar qualquer número daqui.
 
 ### Limites por container
 
@@ -413,6 +416,23 @@ Sob carga, uma fração das linhas ficava `processed=true, sent=false`. Eram **d
 4. **Publicação duplicada por disparo concorrente.** `ConcurrentExecution.SKIP` impede o `@Scheduled` de se sobrepor a si mesmo, mas não sabe do disparo manual pelo console — são caminhos diferentes para o mesmo job. Os dois liam `processed = false` e publicavam: uma execução medida deixou 272.700 mensagens na fila para 200.000 destinatários, ~72 mil publicações duplicadas. Hoje ambos passam por um `JobLauncher` que consulta `getRunningExecutions` antes de iniciar, e o endpoint responde **409** quando recusa, para o console dizer "já em execução" em vez de mostrar falha.
 
 O job de fallback (via `JobLauncher#fallbackTick()`) continua sendo a rede de segurança para o que escapar, com latência de recuperação de até ~20 minutos (até 10 min para entrar na janela + até 10 min para o próximo tick).
+
+### SMTP e transação
+
+O envio SMTP acontece **dentro** da transação que reivindica a linha. Parece errado — uma chamada de rede a um terceiro segurando conexão de banco — e a reescrita óbvia seria commitar o claim primeiro e enviar depois. Essa reescrita troca a prioridade declarada deste sistema: commitando antes, uma queda entre o commit e o envio deixa a linha `sent = true` sem e-mail nenhum, e o job de fallback só republica o que continua `sent = false`. Perda silenciosa.
+
+Mantendo o envio dentro, a queda reverte o claim junto com a conexão, o broker reentrega, e o pior caso é um segundo e-mail para alguém que talvez já tenha recebido — a mesma direção que o resto do sistema já escolheu.
+
+O que sobra é um dual write real: se o SMTP aceita a mensagem e o commit falha depois, o e-mail saiu e o claim não, então a reentrega manda uma segunda cópia. Essa janela não fecha sem servidor de e-mail transacional ou uma coluna de estado de envio. Ela só pode ficar rara — e isso é configuração:
+
+| Chave | Antes | Agora | Por quê |
+|---|---|---|---|
+| `transaction-timeout` | 2s | `${TX_TIMEOUT:30s}` | 2s não cobre uma ida e volta SMTP real; o timeout disparando no meio do envio **fabrica** a duplicata que ele deveria evitar |
+| `jdbc.max-size` | 2 | `${MAIL_WORKERS:10}` | uma conexão por entrega concorrente, senão os workers fazem fila por conexão em vez de por servidor de e-mail |
+| `mail-sender-pool.max-concurrency` | 30 | `${MAIL_WORKERS:10}` | mesmo número, de propósito: 30 workers sobre um pool de 2 significa 28 sempre esperando |
+| `mailer.max-pool-size` | 30 | `${MAIL_WORKERS:10}` | idem, do lado SMTP |
+
+Nada disso apareceu em nenhuma medição porque **todas rodaram com `MAIL_MOCK=true`**, onde um envio custa microssegundos e o timeout de 2s nunca chega perto de estourar.
 
 ### Reproduzindo
 

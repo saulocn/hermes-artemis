@@ -17,6 +17,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @Named
 public class MailFallbackReader extends AbstractItemReader {
 
+    // ~20 min recovery latency mentioned in the README depends on this plus the 10m
+    // @Scheduled(every = "10m") in JobLauncher#fallbackTick().
     public static final int TEN_MINUTES = 10;
     Iterator<Recipient> iterator;
 

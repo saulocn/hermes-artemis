@@ -29,15 +29,14 @@ public class MailReader extends AbstractItemReader {
      * meant hundreds of thousands of entities in a 1 GB container. Whatever is left over is
      * picked up by the next scheduled run.
      *
-     * <p>The cap divided by the scheduler interval is a hard ceiling on delivery rate, so the two
-     * have to be read together: at 30s, a cap of 1000 held the system to ~33 recipients/s —
-     * measured, and a fraction of what the pipeline does. The default 30000 puts the ceiling near
-     * 1000/s.
+     * <p>The cap divided by the scheduler interval is a theoretical ceiling on throughput. At
+     * 100,000 ÷ 30s, that is ~3,300/s — well above what the consumer drains (~1,200/s with one
+     * mailer, ~2,300/s with two), so the enqueuer is not the bottleneck. What this number really
+     * governs is memory: the reader loads that many entities in one go, and at 100,000 the enqueuer
+     * uses ~690 MiB of 1 GiB. See hermes-enqueuer/application.properties for full explanation.
      *
-     * <p>That default is now the binding constraint, not a safety margin: with the JVM tuned, a
-     * 100k benchmark delivers 1190/s (Artemis) and 1429/s (RabbitMQ), both above the ceiling.
-     * Raise it to go faster and watch the enqueuer's memory, because this is exactly the number
-     * that bounds it.
+     * <p>The {@code defaultValue = "30000"} here is only the fallback when the property is absent;
+     * the shipped value in application.properties is 100,000.
      */
     @ConfigProperty(name = "hermes.enqueuer.max-recipients-per-run", defaultValue = "30000")
     int maxRecipientsPerRun;

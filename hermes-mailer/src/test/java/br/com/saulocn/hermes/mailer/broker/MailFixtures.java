@@ -30,7 +30,6 @@ public class MailFixtures {
         Recipient recipient = new Recipient(email, message.getId());
         recipient.setProcessed(true);
         recipient.setSent(false);
-        recipient.setCreatedAt(LocalDateTime.now());
         entityManager.persist(recipient);
 
         return recipient;

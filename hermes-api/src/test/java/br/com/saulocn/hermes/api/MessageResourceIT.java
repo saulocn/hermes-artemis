@@ -8,8 +8,6 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -31,16 +29,6 @@ public class MessageResourceIT {
 
     @Inject
     EntityManager em;
-
-    @BeforeEach
-    @Transactional
-    void fixNullTimestamps() {
-        // Hibernate may create columns without DEFAULT NOW(), so ensure all timestamps are set.
-        em.createNativeQuery("UPDATE hermes.message SET created_on = CURRENT_TIMESTAMP WHERE created_on IS NULL")
-                .executeUpdate();
-        em.createNativeQuery("UPDATE hermes.recipient SET created_on = CURRENT_TIMESTAMP WHERE created_on IS NULL")
-                .executeUpdate();
-    }
 
     @Test
     void postCreatesMessageAndReturnsId() {

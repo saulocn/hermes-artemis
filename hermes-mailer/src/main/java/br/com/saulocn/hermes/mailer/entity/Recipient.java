@@ -32,7 +32,8 @@ public class Recipient {
     @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
     private int attempts;
 
-    @Column(name = "created_on", columnDefinition = "timestamp not null default now()")
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
     public Recipient() {
@@ -89,10 +90,6 @@ public class Recipient {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
     }
 
     public int getAttempts() {

@@ -7,8 +7,6 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,16 +31,6 @@ public class AdminContractIT {
 
     @Inject
     EntityManager em;
-
-    @BeforeEach
-    @Transactional
-    void fixNullTimestamps() {
-        // Hibernate may create columns without DEFAULT NOW(), so ensure all timestamps are set.
-        em.createNativeQuery("UPDATE hermes.message SET created_on = CURRENT_TIMESTAMP WHERE created_on IS NULL")
-                .executeUpdate();
-        em.createNativeQuery("UPDATE hermes.recipient SET created_on = CURRENT_TIMESTAMP WHERE created_on IS NULL")
-                .executeUpdate();
-    }
 
     @Test
     void statsExposesTheThreeRecipientStates() {
@@ -204,6 +192,7 @@ public class AdminContractIT {
      * The bucket the dashboard counts has to be reachable from the list, or the operator sees a
      * number with no way to find the rows behind it. `state=failing` used to match no arm of the
      * where clause at all, so it answered 200 with zero rows — indistinguishable from "none".
+     * Failing is now a partition: not returned by pending, inFlight, delivered, or anything else.
      */
     @Test
     void failingRecipientsCanBeListedAndCarryTheirAttemptCount() {
@@ -220,10 +209,18 @@ public class AdminContractIT {
                 .body("items[0].email", equalTo(email))
                 .body("items[0].attempts", equalTo(3));
 
-        // And it is not confused with a row that is merely queued.
+        // And it is not confused with a row that is merely queued (pending).
         given()
                 .when()
                 .get("/admin/recipients?state=pending&email=" + email)
+                .then()
+                .statusCode(200)
+                .body("total", equalTo(0));
+
+        // And it is not confused with a row that is merely in flight (processed, but no failures).
+        given()
+                .when()
+                .get("/admin/recipients?state=inFlight&email=" + email)
                 .then()
                 .statusCode(200)
                 .body("total", equalTo(0));

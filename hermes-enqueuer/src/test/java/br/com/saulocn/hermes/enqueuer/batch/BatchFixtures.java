@@ -22,6 +22,7 @@ public class BatchFixtures {
         Message message = new Message();
         message.setTitle("Hermes batch");
         message.setText("<p>hello</p>");
+        message.setContentType("text/html");
         entityManager.persist(message);
         return message;
     }
@@ -39,9 +40,17 @@ public class BatchFixtures {
             Recipient recipient = new Recipient("batch-" + java.util.UUID.randomUUID() + "@hermes.test", messageId);
             recipient.setProcessed(processed);
             recipient.setSent(sent);
-            recipient.setCreatedAt(createdAt);
             entityManager.persist(recipient);
             ids.add(recipient.getId());
+        }
+        entityManager.flush();
+        // created_on is database-defaulted and mapped read-only (insertable=false, updatable=false);
+        // backdating must be done via an explicit UPDATE, not through the mapped field.
+        for (Long id : ids) {
+            entityManager.createNativeQuery("update hermes.recipient set created_on = :createdAt where recipient_id = :id")
+                    .setParameter("createdAt", createdAt)
+                    .setParameter("id", id)
+                    .executeUpdate();
         }
         return ids;
     }

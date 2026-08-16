@@ -11,16 +11,24 @@ import java.util.Map;
 @ApplicationScoped
 public class RabbitBrokerAdmin implements BrokerAdmin {
 
-    private static final String MAIN_QUEUE = "MailQueue";
-    private static final String DLQ = "MailQueueDLQ";
+    private static final String DEFAULT_MAIN_QUEUE = "MailQueue";
+    private static final String DEFAULT_DLQ = "MailQueueDLQ";
 
     private final BrokerHttp http;
     private final BrokerEndpoint endpoint;
+    private final String mainQueue;
+    private final String dlqQueue;
 
     @Inject
     public RabbitBrokerAdmin(BrokerHttp http, BrokerEndpoint endpoint) {
         this.http = http;
         this.endpoint = endpoint;
+        // If queue name is blank or null, use the RabbitMQ default; otherwise use configured value
+        this.mainQueue = endpoint.queue() == null || endpoint.queue().isBlank()
+            ? DEFAULT_MAIN_QUEUE
+            : endpoint.queue();
+        // For RabbitMQ, DLQ is always mainQueue + "DLQ" suffix
+        this.dlqQueue = mainQueue + "DLQ";
     }
 
     @Override
@@ -30,7 +38,7 @@ public class RabbitBrokerAdmin implements BrokerAdmin {
 
     @Override
     public QueueDepth read() throws Exception {
-        return new QueueDepth(depthOf(MAIN_QUEUE), depthOf(DLQ));
+        return new QueueDepth(depthOf(mainQueue), depthOf(dlqQueue));
     }
 
     /** %2F is the default vhost "/" — it has to stay percent-encoded in the path. */

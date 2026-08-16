@@ -13,19 +13,25 @@ import java.util.Map;
 @ApplicationScoped
 public class ArtemisBrokerAdmin implements BrokerAdmin {
 
-    private static final String MAIN_QUEUE = "jms.queue.MailQueue";
-    private static final String DLQ = MAIN_QUEUE + "DLQ";
+    private static final String DEFAULT_MAIN_QUEUE = "jms.queue.MailQueue";
 
     /** Jolokia refuses requests it considers cross-origin. RabbitMQ neither needs nor wants this. */
     private static final String ORIGIN_HEADER = "Origin";
 
     private final BrokerHttp http;
     private final BrokerEndpoint endpoint;
+    private final String mainQueue;
+    private final String dlqQueue;
 
     @Inject
     public ArtemisBrokerAdmin(BrokerHttp http, BrokerEndpoint endpoint) {
         this.http = http;
         this.endpoint = endpoint;
+        // If queue name is blank or null, use the Artemis default; otherwise use configured value
+        this.mainQueue = endpoint.queue() == null || endpoint.queue().isBlank()
+            ? DEFAULT_MAIN_QUEUE
+            : endpoint.queue();
+        this.dlqQueue = mainQueue + "DLQ";
     }
 
     @Override
@@ -35,14 +41,14 @@ public class ArtemisBrokerAdmin implements BrokerAdmin {
 
     @Override
     public QueueDepth read() throws Exception {
-        Long main = depthOf(MAIN_QUEUE);
+        Long main = depthOf(mainQueue);
 
         // Artemis creates the dead letter queue only once something lands in it, so a missing
         // MBean means nothing was ever dead-lettered — zero, not unknown. Only that case is
         // treated as zero; a transport failure still propagates, which it did not before.
         Long dlq;
         try {
-            dlq = depthOf(DLQ);
+            dlq = depthOf(dlqQueue);
         } catch (NoSuchMBean e) {
             dlq = 0L;
         }

@@ -62,7 +62,7 @@ export function createMessage(body: CreateMessageRequest): Promise<CreateMessage
 export interface AdminStats {
   pending: number;
   inFlight: number;
-  /** Subset of inFlight: published, undelivered, and known to have thrown at least once. */
+  /** Published, undelivered, and known to have thrown at least once. A partition alongside pending, inFlight, and delivered. */
   failing: number;
   delivered: number;
   totalMessages: number;

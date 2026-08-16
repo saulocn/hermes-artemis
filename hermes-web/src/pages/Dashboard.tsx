@@ -126,10 +126,9 @@ export default function Dashboard() {
 
       <p className="hint">
         <strong>Em trânsito</strong> significa que o destinatário já foi publicado no broker de
-        mensagens, mas ainda não foi confirmado como entregue pelo mailer.{' '}
-        <strong>Falhando</strong> é a parte desses cujo envio já lançou erro ao menos uma vez —
-        sem essa distinção, uma mensagem presa em retentativa e uma apenas aguardando na fila
-        aparecem como o mesmo número.
+        mensagens, mas ainda não foi confirmado como entregue pelo mailer, e nenhum envio falhou.{' '}
+        <strong>Falhando</strong> é a parte de publicados e não entregues cujo envio já lançou erro
+        ao menos uma vez.
       </p>
 
       <div className="card">
