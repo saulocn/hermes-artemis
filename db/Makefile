@@ -12,6 +12,9 @@ net:
 build:
 	docker build -t ${IMAGE_NAME} .
 run: build rm net
-	docker run -d --network ${NETWORK} -p 5432:5432  --memory="1g" --cpus="0.5" --name  ${CONTAINER_NAME} ${IMAGE_NAME}
+	# 2 CPUs, matching the compose profile. At 0.5 the database saturated its quota and was
+	# measured as the joint bottleneck with the broker; raising both together is what took
+	# throughput from ~1.200/s to ~2.300/s. That change never reached this path.
+	docker run -d --network ${NETWORK} -p 5432:5432  --memory="1g" --cpus="2" --name  ${CONTAINER_NAME} ${IMAGE_NAME}
 rm: 
 	docker rm -f ${CONTAINER_NAME} || true

@@ -63,11 +63,18 @@ x-mail-env: &mail-env
 #   ActiveProcessorCount  the container sees 10 CPUs because `cpus: 1` is a quota, not a
 #                         cpuset — Vert.x and the GC sized their pools for hardware the
 #                         process never gets. Pin it to the quota.
-#   HeapDump*             next OOM leaves evidence. ExitOnOutOfMemoryError already comes
-#                         from the base image, which is why the container exits instead of
-#                         limping along.
+#   HeapDump*             next OOM leaves evidence. NOTE: this comment used to claim
+#                         ExitOnOutOfMemoryError came from the base image. It does not — checked
+#                         against /proc/1/cmdline on a running mailer, which carries only the
+#                         flags listed here. A load test proved the cost: the mailer took ten
+#                         OutOfMemoryErrors, one of them from the Transaction Reaper thread, and
+#                         stayed up for hours serving requests with its timeout enforcement dead.
+#                         It is set explicitly below now, so the container dies and restart:always
+#                         brings back a healthy one.
+#   ExitOnOutOfMemory     see above. A process that has lost the reaper is worse than a missing
+#                         one, because nothing reports it as unhealthy.
 x-java-options: &java-options
-  JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -XX:MaxRAMPercentage=70 -XX:+UseG1GC -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+  JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -XX:MaxRAMPercentage=70 -XX:+UseG1GC -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -XX:+ExitOnOutOfMemoryError"
 
 x-java-health: &java-health
   test: ["CMD", "curl", "-f", "http://localhost:8080/q/health/ready"]

@@ -377,7 +377,7 @@ Efeito medido na mesma janela de 90s, contra o mesmo backlog:
 | Coletor | SerialGC | G1 |
 | Memória do container | 444 MiB | 506 MiB / 1 GiB, estável |
 
-O `-XX:+ExitOnOutOfMemoryError` já vinha da imagem base — é por isso que o container morre com exit 3 em vez de ficar meio vivo. Com `restart: always` no compose, ele volta sozinho; no caminho avulso, não.
+O `-XX:+ExitOnOutOfMemoryError` **não** vinha da imagem base, ao contrário do que esta seção afirmava. Verificado em `/proc/1/cmdline` de um mailer rodando: só existiam as flags listadas acima. O custo apareceu num teste de carga — o mailer levou **dez** `OutOfMemoryError`, um deles lançado pelo *Transaction Reaper* (a thread que aplica o `transaction-timeout`), e continuou de pé por horas atendendo requisições com a aplicação de timeout morta. Um processo que perdeu o reaper é pior que um ausente, porque nada o reporta como não-saudável. Agora a flag é passada explicitamente, no compose e nos `sample.env`, e aí sim o container morre e o `restart: always` traz um saudável de volta.
 
 > **Cuidado com aspas.** No `docker-compose.yml` o valor é YAML e as aspas são removidas na leitura. Nos `sample.env` **não**: `--env-file` do Docker não faz parsing de shell, então `JAVA_OPTIONS="..."` entrega o valor *com* as aspas e o `java` trata tudo como nome de classe (`Could not find or load main class "-Dquarkus.http.host=0.0.0.0`). Nos `.env` a linha vai sem aspas.
 
@@ -396,6 +396,22 @@ Um teste de carga acumulou 1,1 milhão de mensagens na fila e expôs o que não 
 - **O job de fallback (via `JobLauncher#fallbackTick()`) gera duplicatas quando o consumo atrasa.** Ele republica tudo com `sent = false` a cada 10 minutos, sem saber que aquilo já está enfileirado: 174 mil cópias em ~68 minutos. Por isso o consumo é idempotente — a duplicata é consumida, reconhecida e descartada sem enviar e-mail. Foram 16.615 descartes observados num único dreno.
 
 > **Nem o Postgres nem o broker têm volume declarado.** Os dados vivem na camada gravável do container, então **recriar o container perde tudo** — foi assim que 296 mil mensagens enfileiradas sumiram ao ajustar limites de CPU no compose. Para um ambiente de desenvolvimento isso é aceitável e até conveniente (`make down` já limpa de propósito); para qualquer outra coisa, declare volumes.
+
+### O RabbitMQ não enxerga o próprio limite de memória
+
+Num teste de carga de 1,1 milhão de destinatários o `hermes-rabbit` morreu com **exit 137 — OOMKilled**. A causa não foi falta de memória; foi ele não saber quanta tinha:
+
+```
+Memory high watermark set to 4761 MiB (4992909312 bytes) of 7936 MiB (8321515520 bytes) total
+```
+
+Sob Docker Desktop ele lê a RAM da VM, não o cgroup do container. Com limite de 512 MiB, o watermark de flow control ficou **9,3× acima do ponto em que o Linux mata o processo** — o back-pressure nunca teve como entrar, e ele aceitou publicação até ser morto. No compose a distância era menor (1 GiB de limite) mas o defeito era o mesmo.
+
+O conserto está em `rabbit/rabbitmq.conf`: `total_memory_available_override_value = 1GB` mais `vm_memory_high_watermark.relative = 0.4`. Com isso o alarme dispara em ~410 MiB e o RabbitMQ **bloqueia os publicadores** em vez de morrer: o ack timeout do enqueuer estoura, o chunk é revertido e o próximo tick tenta de novo. Lento em vez de morto, e sem perder nada. **Esse valor precisa acompanhar o limite do container** — ele está fixado em 1 GiB em três lugares (`docker-compose.yml`, `rabbit/Makefile` e o próprio `.conf`).
+
+> **Por que o Artemis sobreviveu ao mesmo teste.** Não foi por ter mais memória — os dois têm 1 GiB. O heap do Artemis é governado pela JVM, e `MaxRAMPercentage` **lê o cgroup** corretamente. O Artemis sabia o seu tamanho; o RabbitMQ não. Essa assimetria não aparece em nenhuma medição de vazão, só sob backlog grande.
+
+**Os limites de recurso viviam em dois lugares e só um foi corrigido.** Quando a medição mostrou broker e banco saturando a 0,5 CPU, os números novos entraram no `docker-compose.yml` e não nos `Makefile` de cada serviço — então `make run-all-rabbit` continuou subindo o broker com 512m/1cpu e o banco com 0,5 cpu. Foi nesse caminho que o teste de carga rodou. Os dois caminhos agora usam 1g/2cpu.
 
 ### O que foi corrigido
 

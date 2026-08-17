@@ -13,6 +13,9 @@ net:
 build:
 	docker build -t ${IMAGE_NAME} .
 run: build rm net
-	docker run -d --network ${NETWORK} --memory="512m" --cpus="1" -e ARTEMIS_PASSWORD=pass_hermes -p 8161:8161 -p 61616:61616 -p 5672:5672 --name  ${CONTAINER_NAME} ${IMAGE_NAME}
+	# 1g/2cpu, matching the compose profile. Artemis survived the same load test only because its
+	# heap is JVM-governed and MaxRAMPercentage does read the cgroup — it was never protected by
+	# having more memory, just by knowing how much it had.
+	docker run -d --network ${NETWORK} --memory="1g" --cpus="2" -e ARTEMIS_PASSWORD=pass_hermes -p 8161:8161 -p 61616:61616 -p 5672:5672 --name  ${CONTAINER_NAME} ${IMAGE_NAME}
 rm:
 	docker rm -f ${CONTAINER_NAME} || true
