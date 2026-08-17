@@ -4,6 +4,11 @@ package-lock.json
 target/
 **/target/
 
+# Saídas de teste da tela
+coverage/
+playwright-report/
+test-results/
+
 # IDEs
 .idea/
 *.iml

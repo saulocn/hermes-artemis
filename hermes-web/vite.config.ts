@@ -17,7 +17,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporters: ['text', 'html'],
-      exclude: ['src/test/**', 'src/main.tsx'],
+      exclude: ['src/test/**', 'src/main.tsx', 'src/components/RichTextEditor.tsx'], // RichTextEditor uses ProseMirror which requires real layout, covered by Playwright instead
       thresholds: {
         lines: 80,
         functions: 80,

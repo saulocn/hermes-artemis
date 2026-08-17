@@ -5,6 +5,12 @@ import Compose from './Compose';
 import { renderWithRouter, mockFetchRoutes, expectRequest, jsonResponse } from '../test/helpers';
 import { createMessageResponse } from '../test/fixtures';
 
+vi.mock('../components/RichTextEditor', () => ({
+  default: ({ value, onChange, ariaLabel }: { value: string; onChange: (html: string) => void; ariaLabel: string }) => (
+    <textarea aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}));
+
 describe('Compose page', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -42,12 +48,10 @@ describe('Compose page', () => {
 
     const titleInput = screen.getByLabelText('Título');
     const textInput = screen.getByLabelText('Texto');
-    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
     const recipientsInput = screen.getByLabelText(/Destinatários/);
 
     await user.type(titleInput, 'Test Campaign');
     await user.type(textInput, 'This is the message body.');
-    await user.selectOptions(contentTypeSelect, 'text/html');
     await user.type(recipientsInput, 'alice@example.com\nbob@example.com');
 
     await user.click(screen.getByRole('button', { name: 'Enviar' }));
@@ -62,7 +66,7 @@ describe('Compose page', () => {
     expect(request.body).toEqual({
       title: 'Test Campaign',
       text: 'This is the message body.',
-      contentType: 'text/html',
+      contentType: 'text/plain',
       recipients: ['alice@example.com', 'bob@example.com'],
     });
 
@@ -155,7 +159,6 @@ describe('Compose page', () => {
 
     await user.type(titleInput, 'Test');
     await user.type(textInput, 'Body');
-    await user.selectOptions(contentTypeSelect, 'text/html');
     await user.type(recipientsInput, 'alice@example.com');
 
     await user.click(screen.getByRole('button', { name: 'Enviar' }));
@@ -167,7 +170,7 @@ describe('Compose page', () => {
     expect(titleInput.value).toBe('');
     expect(textInput.value).toBe('');
     expect(recipientsInput).toHaveValue('');
-    expect(contentTypeSelect.value).toBe('text/html');
+    expect(contentTypeSelect.value).toBe('text/plain');
   });
 
   it('shows error banner and preserves form on API failure', async () => {
@@ -195,5 +198,138 @@ describe('Compose page', () => {
     expect(titleInput.value).toBe('Test');
     expect(textInput.value).toBe('Body');
     expect(recipientsInput.value).toBe('alice@example.com');
+  });
+
+  it('switches to text/html and shows editor and preview', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', mockFetchRoutes({}));
+    renderWithRouter(<Compose />);
+
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+
+    expect(screen.getByLabelText('Texto')).toBeInTheDocument();
+
+    await user.selectOptions(contentTypeSelect, 'text/html');
+
+    // After switching to HTML mode, the editor should appear (Suspense will resolve it)
+    const editorTextarea = await screen.findByLabelText('Texto');
+    expect(editorTextarea).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copiar HTML' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Baixar .html' })).toBeInTheDocument();
+  });
+
+  it('submitting in html mode POSTs wrapped document with contentType text/html', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetchRoutes({ '/api/message': createMessageResponse });
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithRouter(<Compose />);
+
+    const titleInput = screen.getByLabelText('Título');
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+    const recipientsInput = screen.getByLabelText(/Destinatários/);
+
+    await user.type(titleInput, 'Newsletter');
+    await user.selectOptions(contentTypeSelect, 'text/html');
+
+    const editorTextarea = await screen.findByLabelText('Texto');
+    await user.type(editorTextarea, '<p>Hello World</p>');
+    await user.type(recipientsInput, 'alice@example.com');
+
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Mensagem criada com sucesso/)).toBeInTheDocument();
+    });
+
+    const request = expectRequest(fetchMock, 0);
+    expect(request.body.contentType).toBe('text/html');
+    expect(request.body.text).toMatch(/^<!DOCTYPE/);
+    expect(request.body.text).toContain('Hello World');
+    expect(request.body.text).not.toContain('<script');
+  });
+
+  it('seeds html from plain text when switching plain -> html', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', mockFetchRoutes({}));
+    renderWithRouter(<Compose />);
+
+    const plainTextarea = screen.getByLabelText('Texto');
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+
+    await user.type(plainTextarea, 'This is plain text');
+
+    await user.selectOptions(contentTypeSelect, 'text/html');
+
+    const htmlTextarea = (await screen.findByLabelText('Texto')) as HTMLTextAreaElement;
+    expect(htmlTextarea.value).toContain('This is plain text');
+  });
+
+  it('preserves both buffers when switching back and forth', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', mockFetchRoutes({}));
+    renderWithRouter(<Compose />);
+
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+
+    // Type plain text
+    let textInput = screen.getByLabelText('Texto') as HTMLTextAreaElement;
+    await user.type(textInput, 'Plain text content');
+    const plainValue = textInput.value;
+
+    // Switch to HTML
+    await user.selectOptions(contentTypeSelect, 'text/html');
+    let htmlTextarea = (await screen.findByLabelText('Texto')) as HTMLTextAreaElement;
+    await user.type(htmlTextarea, '<p>HTML content</p>');
+
+    // Switch back to plain
+    await user.selectOptions(contentTypeSelect, 'text/plain');
+    textInput = screen.getByLabelText('Texto') as HTMLTextAreaElement;
+    expect(textInput.value).toBe(plainValue);
+
+    // Switch back to HTML, plain buffer should be preserved but html buffer should still be there
+    await user.selectOptions(contentTypeSelect, 'text/html');
+    htmlTextarea = (await screen.findByLabelText('Texto')) as HTMLTextAreaElement;
+    expect(htmlTextarea.value).toContain('HTML content');
+  });
+
+  it('shows validation error for empty html content', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', mockFetchRoutes({}));
+    renderWithRouter(<Compose />);
+
+    const titleInput = screen.getByLabelText('Título');
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+    const recipientsInput = screen.getByLabelText(/Destinatários/);
+
+    await user.type(titleInput, 'Test');
+    await user.selectOptions(contentTypeSelect, 'text/html');
+
+    const editorTextarea = await screen.findByLabelText('Texto');
+    await user.type(editorTextarea, '<p><br></p>');
+    await user.type(recipientsInput, 'alice@example.com');
+
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+
+    expect(screen.getByText('Informe o texto da mensagem.')).toBeInTheDocument();
+  });
+
+  it('shows hint when switching back to plain with html content preserved', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', mockFetchRoutes({}));
+    renderWithRouter(<Compose />);
+
+    const contentTypeSelect = screen.getByLabelText('Tipo de conteúdo');
+
+    // Switch to HTML and type content
+    await user.selectOptions(contentTypeSelect, 'text/html');
+    const htmlTextarea = await screen.findByLabelText('Texto');
+    await user.type(htmlTextarea, '<p>HTML content</p>');
+
+    // Switch back to plain
+    await user.selectOptions(contentTypeSelect, 'text/plain');
+
+    expect(
+      screen.getByText('O conteúdo HTML foi mantido e reaparece ao voltar para text/html.'),
+    ).toBeInTheDocument();
   });
 });

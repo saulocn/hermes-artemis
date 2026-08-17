@@ -8,11 +8,19 @@ test('dashboard: stat cards and broker info', async ({ page }) => {
   // so a bare locator('h2') trips Playwright's strict mode.
   await expect(page.getByRole('heading', { name: 'Painel' })).toBeVisible();
 
-  // Check four stat cards are present with numeric values
+  // Five cards: the four recipient states, which partition the table, plus the message total.
+  // "Falhando" joined them when a failing delivery stopped being indistinguishable from a queued
+  // one; this spec still expected four and had been failing since.
   const statCards = page.locator('.stat-card');
-  await expect(statCards).toHaveCount(4);
+  await expect(statCards).toHaveCount(5);
 
-  const cardLabels = ['Pendentes', 'Em trânsito', 'Entregues', 'Total de mensagens'];
+  const cardLabels = [
+    'Pendentes',
+    'Em trânsito',
+    'Falhando',
+    'Entregues',
+    'Total de mensagens',
+  ];
   for (const label of cardLabels) {
     const card = page.locator('.stat-card', { has: page.locator(`dt:has-text("${label}")`) });
     await expect(card).toBeVisible();
