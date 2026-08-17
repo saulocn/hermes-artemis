@@ -76,18 +76,40 @@ done
 
 overflows=$(compose logs "$ENQUEUER" 2>&1 | grep -c 'SRMSG00034' || true)
 
+# The honest span, from the delivery timestamps themselves.
+#
+# The polled window below cannot be trusted on a large run: seeding N messages takes tens of
+# seconds, delivery starts as soon as the first chunk is published, and the clock above only
+# starts after seeding finishes. So every delivery that happened *during* seeding is counted
+# against a window that excludes it. That is why "time to 1st delivery" reads 0s on big runs —
+# it is not fast, it is late. Measured on a 100k run: polled window 59s against a real
+# claimed_on span of 104s, reporting 1695/s for something that actually ran at 962/s.
+#
+# `is not null` is mandatory: without it the min/max cannot match the partial index and the
+# query degrades to a sequential scan.
+claimed_span=$(count "select coalesce(ceil(extract(epoch from max(claimed_on) - min(claimed_on))), 0) from hermes.recipient where claimed_on is not null")
+claimed_count=$(count "select count(*) from hermes.recipient where claimed_on is not null")
+
 echo
 echo "== $LABEL result =="
-python3 - "$seeded" "$sent" "${first_delivery:-0}" "${last_change:-0}" "$overflows" <<'PY'
+python3 - "$seeded" "$sent" "${first_delivery:-0}" "${last_change:-0}" "$overflows" "$claimed_span" "$claimed_count" <<'PY'
 import sys
-seeded, sent, first, last, overflows = (int(x) for x in sys.argv[1:6])
+seeded, sent, first, last, overflows, span, counted = (int(x) for x in sys.argv[1:8])
 window = max(last - first, 1)
+span = max(span, 1)
 print(f"recipients seeded:    {seeded}")
 print(f"delivered:            {sent}")
 print(f"stragglers:           {seeded - sent} (recovered later by the fallback job)")
 print(f"time to 1st delivery: {first}s (enqueuer scheduler runs every 30s)")
-print(f"delivery window:      {window}s")
-print(f"sustained throughput: {sent/window:.0f} recipients/s "
-      f"({sent/window*60:.0f}/min, {sent/window*3600:.0f}/h)")
+print()
+print(f"sustained throughput: {counted/span:.0f} recipients/s "
+      f"({counted/span*60:.0f}/min, {counted/span*3600:.0f}/h)")
+print(f"  from claimed_on:    {counted} delivered across a {span}s span")
+print(f"  same arithmetic as /admin/rates -> claimed.sustainedPerSecond, so the console and this")
+print(f"  script agree on the same run. Trust this line.")
+print()
+print(f"polled window:        {sent/window:.0f} recipients/s over {window}s -- OVERSTATED")
+print(f"  Kept for continuity with older results only. The clock starts after seeding, so any")
+print(f"  delivery that overlapped seeding is credited to a window that excludes it.")
 print(f"emitter overflows:    {overflows} (SRMSG00034 in the enqueuer log)")
 PY

@@ -292,7 +292,9 @@ O enfileirador é **4× mais rápido** que o consumidor: aumentá-lo só encheri
 
 Escalar o mailer sozinho **também não resolve**:
 
-| Configuração | Vazão |
+> **Toda esta tabela usa a régua antiga**, a que superestima em ~80% (ver a seção de medições). As *comparações relativas* entre linhas continuam válidas — foram feitas com o mesmo erro em todas —, mas os valores absolutos não. Divida por ~1,8 para a ordem de grandeza real, ou refaça com `make bench`, que agora reporta o span verdadeiro.
+
+| Configuração | Vazão (régua antiga) |
 |---|---|
 | 1 mailer, broker/banco 0,5 CPU | ~1.200/s |
 | 2–3 mailers, broker/banco 0,5 CPU | ~1.160–1.560/s — **sem ganho** |
@@ -307,13 +309,33 @@ Para ir além de ~2.300/s: `docker compose up -d --scale mailer-rabbit=N` e acom
 
 Com a configuração padrão do compose (1 mailer):
 
-| | Artemis | RabbitMQ |
+| | Artemis (corrigido) | Artemis (número antigo, inflado) |
 |---|---|---|
-| 10.000 | 244–769/s | 667/s |
-| **100.000** | **1.449/s** | **1.220/s** |
+| **100.000**, antes do reuso de Jsonb | ~1.163/s, span real de 86s | 1.449–2.128/s |
+| **100.000**, depois | **~1.852/s**, span real de 54s | — |
 | Não entregues | 0 | 0 |
 
-**Confie na linha de 100 mil.** O teste de 10 mil drena em 13–41s com polling a cada 2s, então a resolução é péssima e os valores oscilaram entre 244 e 769/s entre execuções da mesma configuração. Com ~70–80s de janela a medição estabiliza.
+> **Os números antigos estavam inflados, e por um defeito do próprio `bench.sh`.** Ele semeia todas as mensagens, **só então** liga o cronômetro, e divide *todas* as entregas pela janela que observou. Numa corrida de 100 mil a semeadura leva ~48s, e a entrega começa assim que o primeiro chunk é publicado — ou seja, dezenas de milhares são entregues antes do relógio começar. O `time to 1st delivery: 0s` que aparece na saída é o sintoma, não um elogio: significa que já havia entrega em curso na primeira leitura.
+>
+> Medido nas duas pontas na mesma corrida: janela amostrada 47s → 2.128/s, span real de `claimed_on` 86s → **1.163/s**. Superestimação de 83%. Numa segunda corrida, 59s → 1.695/s contra 104s → 962/s, 76%.
+>
+> O script agora reporta as duas linhas e diz qual acreditar. A linha boa usa `max(claimed_on) − min(claimed_on)`, que é a mesma aritmética de `/admin/rates → claimed.sustainedPerSecond` — console e benchmark passam a concordar sobre a mesma corrida, que era o ponto de existir o carimbo.
+
+### Concorrência do mailer, medida
+
+`MAIL_WORKERS` governa juntos o pool JDBC, o worker pool do consumidor e o pool SMTP. Medido em corridas de 100 mil, com o span real de `claimed_on`:
+
+| `MAIL_WORKERS` | Vazão |
+|---|---|
+| 5 | 1.299/s |
+| **10 (default)** | **1.852/s** |
+| 30 | 1.316/s |
+
+A curva tem pico em 10 e cai dos dois lados. Para cima não é falta de trabalho: com 1 CPU e 1 GiB, trinta threads geram troca de contexto e pressão de GC, e trinta conexões batem num banco que também tem CPU limitada. Para baixo é o oposto — cinco threads não cobrem a latência de ida e volta ao banco.
+
+> Isto vale para **`MAIL_MOCK=true`**, onde o envio custa microssegundos. Com SMTP real o envio domina e o ponto ótimo muda: cada worker passa a segurar uma conexão de banco durante a ida e volta ao servidor de e-mail, e o número certo depende da latência dele. Meça no seu ambiente antes de mexer.
+
+**A ressalva sobre janela curta continua valendo.** O teste de 10 mil drena rápido demais para polling de 2s e oscilou entre 244 e 769/s entre execuções idênticas.
 
 Ingestão medida à parte com k6 (1 VU): **6.748 destinatários/s**. A API não é o gargalo; ela só insere no Postgres.
 
@@ -384,7 +406,7 @@ O `-XX:+ExitOnOutOfMemoryError` **não** vinha da imagem base, ao contrário do 
 ### Estimativa de volume
 
 - **Tempo até a primeira entrega é cadência, não capacidade**: o job de enfileiramento (via `JobLauncher#enqueueTick()`) roda a cada 30s, então tudo espera ~15s em média mesmo com o sistema vazio. O console permite pular essa espera com o disparo manual.
-- **Número de planejamento conservador: ~1.200 destinatários/s (~4,3 milhões/hora)** na configuração padrão, e **~2.300/s com dois mailers**. Ressalva: medido em janelas de ~70–80s, **não validado em regime de horas** — use o cenário `soak` do k6 para isso.
+- **Número de planejamento conservador: ~1.100 destinatários/s (~4 milhões/hora)** na configuração padrão, medido pelo span real de `claimed_on` numa corrida de 100 mil. O número de dois mailers (~2.300/s) vem da régua antiga e **não foi refeito** — divida-o por ~1,8 até que seja. Ressalva que continua: não validado em regime de horas; use o cenário `soak` do k6.
 - O cap do reader (`hermes.enqueuer.max-recipients-per-run`) dividido pelo intervalo do scheduler é um teto de vazão do *enfileirador*. No default de 100.000 ÷ 30s isso dá ~3.300/s, bem acima do que o consumidor entrega, então **não é mais o limitante** — mas é o número que decide quantas entidades o reader carrega de uma vez, e a 100.000 o enqueuer usa ~690 MiB de 1 GiB.
 
 ### Backlog grande
