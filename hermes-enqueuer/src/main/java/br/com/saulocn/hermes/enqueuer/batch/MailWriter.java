@@ -62,6 +62,6 @@ public class MailWriter extends AbstractItemWriter {
                 .setParameter("ids", ids)
                 .executeUpdate();
 
-        ids.forEach(id -> log.info("Sent to queue: " + id));
+        log.debugf("Sent chunk of %d recipients to queue", ids.size());
     }
 }

@@ -80,4 +80,22 @@ public class MailVO {
     public static MailVO fromJSON(String json) {
         return JSONB.fromJson(json, MailVO.class);
     }
+
+    /**
+     * Returns a log-safe representation that redacts personal data.
+     * This toString() MUST NOT leak message content.
+     * The text length is sufficient for operational logging.
+     * Do NOT "improve" this by adding the full text back — the whole point
+     * is that safe objects cannot leak no matter who logs them.
+     */
+    @Override
+    public String toString() {
+        String textLength = text != null ? String.format("<%d chars>", text.length()) : "<null>";
+        return "MailVO{" +
+                "messageId=" + messageId +
+                ", subject='" + subject + '\'' +
+                ", text=" + textLength +
+                ", contentType='" + contentType + '\'' +
+                '}';
+    }
 }

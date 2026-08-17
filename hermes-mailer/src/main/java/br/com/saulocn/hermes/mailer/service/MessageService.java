@@ -61,7 +61,7 @@ public class MessageService {
      */
     @Transactional
     public void deliver(RecipientVO recipientVO) {
-        log.info("Consuming: " + recipientVO.getId());
+        log.debugf("Consuming: %d", recipientVO.getId());
 
         // Claim the recipient before sending, with the check and the write in one statement.
         // Reading `sent` and then updating it leaves a window: MailFallbackJob republishes
@@ -85,11 +85,13 @@ public class MessageService {
         if (claimed == 0) {
             // Already delivered by another copy. Returning normally acks the message, which is
             // what drops the duplicate off the queue instead of letting it redeliver forever.
-            log.info("Duplicate, already sent: " + recipientVO.getId());
+            // Keep at INFO: this is rare, visible evidence the idempotency guard is working,
+            // and was how a 16,615-duplicate drain was diagnosed.
+            log.infof("Duplicate, already sent: %d", recipientVO.getId());
             return;
         }
 
-        log.info("Sending: " + recipientVO.getId());
+        log.debugf("Sending: %d", recipientVO.getId());
         MailVO mailVO = findById(recipientVO.getMessageId());
         mailVO.setTo(recipientVO.getEmail());
         mailVO.setRecipientId(recipientVO.getId());
@@ -105,10 +107,10 @@ public class MessageService {
             Message message = entityManager.find(Message.class, messageId);
             mailVO = MailVO.fromMessage(message);
             setToCache(mailVO);
-            log.info("Found in DB: Message "+mailVO.getMessageId());
+            log.debugf("Found in DB: Message %d", mailVO.getMessageId());
             return mailVO;
         } else {
-            log.info("Found in cache: Message "+mailVO.getMessageId());
+            log.debugf("Found in cache: Message %d", mailVO.getMessageId());
             return mailVO;
         }
     }

@@ -28,7 +28,7 @@ public class MailSenderService {
 
     @Transactional
     public void sendHtmlMail(MailVO mailVO) {
-        log.info("Sending email:" + mailVO);
+        log.debugf("Sending email for recipientId=%d", mailVO.getRecipientId());
         // Use the contentType if present and is text/plain; default to HTML otherwise (including null/blank)
         String contentType = mailVO.getContentType();
         Mail mail;
@@ -38,7 +38,7 @@ public class MailSenderService {
             mail = Mail.withHtml(mailFrom, mailVO.getSubject(), mailVO.getText());
         }
         mailer.send(mail.addTo(mailVO.getTo()));
-        log.info("Success: "+ mailVO.getRecipientId());
+        log.debugf("Success: recipientId=%d", mailVO.getRecipientId());
     }
 
 }
