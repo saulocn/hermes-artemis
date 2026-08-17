@@ -76,7 +76,11 @@ test-e2e: ## Sobe a stack, roda o E2E e derruba
 			$(MAKE) down; \
 			exit 1; \
 		fi
-		@cd hermes-web && npx playwright test; \
+		@# The cd is scoped to a subshell on purpose. It used to sit on this same continued line
+		@# as the teardown, so `$(MAKE) down` ran inside hermes-web/ — which has no `down` target.
+		@# The stack was never torn down, and because that error was the last command it became
+		@# the target's exit code, masking whatever Playwright had reported.
+		@(cd hermes-web && npx playwright test); \
 		exit_code=$$?; \
 		$(MAKE) down; \
 		exit $$exit_code

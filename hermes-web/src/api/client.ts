@@ -69,19 +69,77 @@ export interface AdminStats {
   oldestPendingSeconds: number | null;
 }
 
-export function getAdminStats(): Promise<AdminStats> {
-  return request<AdminStats>('/admin/stats');
+export async function getAdminStats(): Promise<AdminStats> {
+  // oldestPendingSeconds is absent, not null, when nothing is pending. See orNull below.
+  const raw = await request<AdminStats>('/admin/stats');
+  return { ...raw, oldestPendingSeconds: raw.oldestPendingSeconds ?? null };
 }
 
-// ---- Admin: throughput -----------------------------------------------------
+// ---- Admin: rates (per-stage rates) -----------------------------------------------
+
+export interface StageRate {
+  count: number;
+  window: number;
+  span: number | null;
+  ratePerSecond: number;
+  sustainedPerSecond: number | null;
+}
+
+export interface RatesResponse {
+  created: StageRate;
+  published: StageRate;
+  claimed: StageRate;
+  lastPublishAt: string | null;
+  asOf: string;
+}
+
+/**
+ * Absent is the same as null, and that translation happens here, once.
+ *
+ * JSON-B omits null fields entirely, so the server sends `{count, window, ratePerSecond}` with no
+ * `span` and no `sustainedPerSecond` rather than sending them as null. The types below say
+ * `number | null`, every consumer checked `!== null`, and `undefined !== null` is true — so the
+ * dashboard called `.toFixed()` on undefined and the whole page went blank. Unit tests could not
+ * catch it: the fixtures were written with every field present, which is a shape the server never
+ * actually produces for an idle pipeline.
+ *
+ * Normalising at the boundary keeps that quirk in one function instead of turning every downstream
+ * null check into a loose one, and lets the declared types be true inside the app.
+ */
+function orNull<T>(value: T | null | undefined): T | null {
+  return value ?? null;
+}
+
+function normaliseStage(stage: StageRate): StageRate {
+  return { ...stage, span: orNull(stage.span), sustainedPerSecond: orNull(stage.sustainedPerSecond) };
+}
+
+export async function getRates(window = 30): Promise<RatesResponse> {
+  const raw = await request<RatesResponse>(`/admin/rates?window=${encodeURIComponent(window)}`);
+  return {
+    ...raw,
+    created: normaliseStage(raw.created),
+    published: normaliseStage(raw.published),
+    claimed: normaliseStage(raw.claimed),
+    lastPublishAt: orNull(raw.lastPublishAt),
+  };
+}
+
+// ---- Admin: throughput (per-minute series) ------------------------------------
 
 export interface ThroughputPoint {
   minute: string;
-  delivered: number;
+  count: number | null;
+}
+
+export interface ThroughputSeries {
+  stage: string;
+  points: ThroughputPoint[];
 }
 
 export interface ThroughputResponse {
-  points: ThroughputPoint[];
+  series: ThroughputSeries[];
+  asOf: string;
 }
 
 export function getThroughput(minutes = 60): Promise<ThroughputResponse> {
@@ -94,11 +152,20 @@ export interface BrokerStatus {
   kind: 'artemis' | 'rabbit';
   queueDepth: number | null;
   dlqDepth: number | null;
+  ackRate: number | null;
   error: string | null;
 }
 
-export function getBrokerStatus(): Promise<BrokerStatus> {
-  return request<BrokerStatus>('/admin/broker');
+export async function getBrokerStatus(): Promise<BrokerStatus> {
+  // queueDepth, dlqDepth, ackRate and error are all omitted when null — see orNull above.
+  const raw = await request<BrokerStatus>('/admin/broker');
+  return {
+    ...raw,
+    queueDepth: raw.queueDepth ?? null,
+    dlqDepth: raw.dlqDepth ?? null,
+    ackRate: raw.ackRate ?? null,
+    error: raw.error ?? null,
+  };
 }
 
 // ---- Admin: messages -----------------------------------------------------

@@ -16,5 +16,5 @@ public interface BrokerAdmin {
     /** Matched against hermes.broker.kind to pick the adapter at runtime. */
     String kind();
 
-    QueueDepth read() throws Exception;
+    QueueReading read() throws Exception;
 }

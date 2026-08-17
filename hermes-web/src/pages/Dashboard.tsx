@@ -3,11 +3,14 @@ import {
   ApiError,
   getAdminStats,
   getBrokerStatus,
+  getRates,
   getThroughput,
   type AdminStats,
   type BrokerStatus,
-  type ThroughputPoint,
+  type RatesResponse,
+  type ThroughputSeries,
 } from '../api/client';
+import RateCard from '../components/RateCard';
 import ThroughputChart from '../components/ThroughputChart';
 
 type IntervalOption = 'off' | '2000' | '5000' | '15000';
@@ -27,31 +30,61 @@ function describeError(err: unknown): string {
 
 export default function Dashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [broker, setBroker] = useState<BrokerStatus | null>(null);
-  const [points, setPoints] = useState<ThroughputPoint[]>([]);
+  const [brokerError, setBrokerError] = useState<string | null>(null);
+  const [rates, setRates] = useState<RatesResponse | null>(null);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+  const [series, setSeries] = useState<ThroughputSeries[]>([]);
+  const [throughputError, setThroughputError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [intervalOption, setIntervalOption] = useState<IntervalOption>('5000');
   const isFirstLoad = useRef(true);
+  const throughputTimerRef = useRef<number | null>(null);
 
+  // Effect 1: Load stats, broker, and rates on the selected interval
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        const [statsResult, brokerResult, throughputResult] = await Promise.all([
+        const results = await Promise.allSettled([
           getAdminStats(),
           getBrokerStatus(),
-          getThroughput(60),
+          getRates(30),
         ]);
+
         if (cancelled) return;
-        setStats(statsResult);
-        setBroker(brokerResult);
-        setPoints(throughputResult.points);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setError(describeError(err));
+
+        // Handle stats
+        const statsResult = results[0];
+        if (statsResult.status === 'fulfilled') {
+          setStats(statsResult.value);
+          setStatsError(null);
+        } else {
+          setStats(null);
+          setStatsError(describeError(statsResult.reason));
+        }
+
+        // Handle broker
+        const brokerResult = results[1];
+        if (brokerResult.status === 'fulfilled') {
+          setBroker(brokerResult.value);
+          setBrokerError(null);
+        } else {
+          setBroker(null);
+          setBrokerError(describeError(brokerResult.reason));
+        }
+
+        // Handle rates
+        const ratesResult = results[2];
+        if (ratesResult.status === 'fulfilled') {
+          setRates(ratesResult.value);
+          setRatesError(null);
+        } else {
+          setRates(null);
+          setRatesError(describeError(ratesResult.reason));
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -75,6 +108,34 @@ export default function Dashboard() {
     };
   }, [intervalOption]);
 
+  // Effect 2: Load throughput on a fixed 60s timer (independent of intervalOption)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadThroughput() {
+      try {
+        const result = await getThroughput(60);
+        if (cancelled) return;
+        setSeries(result.series);
+        setThroughputError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setSeries([]);
+        setThroughputError(describeError(err));
+      }
+    }
+
+    loadThroughput();
+
+    const timer = window.setInterval(loadThroughput, 60000);
+    throughputTimerRef.current = timer as any;
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   return (
     <div>
       <h2 className="page-title">Painel</h2>
@@ -96,10 +157,19 @@ export default function Dashboard() {
         </select>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
       {loading && <p className="loading">Carregando…</p>}
 
-      {stats && (
+      {rates && !ratesError ? (
+        <RateCard
+          rates={rates}
+          ackRate={broker?.ackRate ?? null}
+          oldestPendingSeconds={stats?.oldestPendingSeconds ?? null}
+        />
+      ) : (
+        ratesError && <div className="error-banner">{ratesError}</div>
+      )}
+
+      {stats && !statsError ? (
         <div className="stat-grid">
           <dl className="stat-card">
             <dt>Pendentes</dt>
@@ -122,6 +192,8 @@ export default function Dashboard() {
             <dd>{stats.totalMessages}</dd>
           </dl>
         </div>
+      ) : (
+        statsError && <div className="error-banner">{statsError}</div>
       )}
 
       <p className="hint">
@@ -135,7 +207,7 @@ export default function Dashboard() {
         <div className="section-heading">
           <h2>Broker de mensagens</h2>
         </div>
-        {broker ? (
+        {broker && !brokerError ? (
           <div>
             <p>
               Tipo: <strong>{broker.kind}</strong>
@@ -145,15 +217,22 @@ export default function Dashboard() {
             {broker.error && <div className="error-banner">{broker.error}</div>}
           </div>
         ) : (
-          !loading && <p className="hint">Sem dados do broker.</p>
+          brokerError && <div className="error-banner">{brokerError}</div>
         )}
       </div>
 
       <div className="card">
         <div className="section-heading">
-          <h2>Vazão (últimos 60 minutos)</h2>
+          <h2>Vazão por minuto (últimos 60 minutos)</h2>
         </div>
-        <ThroughputChart points={points} />
+        {throughputError ? (
+          <div className="error-banner">{throughputError}</div>
+        ) : (
+          <>
+            <ThroughputChart series={series} />
+            <p className="hint">O minuto em progresso é excluído do gráfico.</p>
+          </>
+        )}
       </div>
     </div>
   );

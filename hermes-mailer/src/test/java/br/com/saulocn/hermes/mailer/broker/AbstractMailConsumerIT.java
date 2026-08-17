@@ -14,6 +14,7 @@ import java.util.UUID;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -87,6 +88,10 @@ abstract class AbstractMailConsumerIT {
                     "expected exactly one mail delivered to " + email);
             assertTrue(fixtures.isSent(recipient.getId()),
                     "recipient should be flagged as sent after consumption");
+            // When a send succeeds, claimedAt is committed, marking when the claim was made.
+            // This proves the invariant: committed claimedAt means the message was delivered.
+            assertNotNull(fixtures.claimedAtOf(recipient.getId()),
+                    "claimedAt must be set when the send succeeds and commits");
         });
     }
 }

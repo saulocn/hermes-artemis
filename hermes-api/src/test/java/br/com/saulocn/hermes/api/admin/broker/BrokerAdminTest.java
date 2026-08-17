@@ -1,5 +1,6 @@
 package br.com.saulocn.hermes.api.admin.broker;
 
+import br.com.saulocn.hermes.api.admin.BrokerAdminService;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import org.junit.jupiter.api.Test;
@@ -56,26 +57,30 @@ class BrokerAdminTest {
     @Test
     void rabbitReadsBothDepths() throws Exception {
         StubHttp http = new StubHttp()
-                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 7}")
-                .on("/api/queues/%2F/MailQueue", "{\"messages\": 42}");
+                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 7, \"message_stats\": {\"publish\": 10, \"ack\": 3}}")
+                .on("/api/queues/%2F/MailQueue", "{\"messages\": 42, \"message_stats\": {\"publish\": 100, \"ack\": 58}}");
 
-        QueueDepth depth = new RabbitBrokerAdmin(http, ENDPOINT).read();
+        QueueReading reading = new RabbitBrokerAdmin(http, ENDPOINT).read();
 
-        assertEquals(42L, depth.main());
-        assertEquals(7L, depth.dlq());
+        assertEquals(42L, reading.main());
+        assertEquals(7L, reading.dlq());
+        assertEquals(100L, reading.enqueued());
+        assertEquals(58L, reading.acknowledged());
     }
 
     @Test
     void rabbitUsesConfiguredQueueName() throws Exception {
         BrokerEndpoint customEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "CustomMail");
         StubHttp http = new StubHttp()
-                .on("/api/queues/%2F/CustomMailDLQ", "{\"messages\": 3}")
-                .on("/api/queues/%2F/CustomMail", "{\"messages\": 99}");
+                .on("/api/queues/%2F/CustomMailDLQ", "{\"messages\": 3, \"message_stats\": {\"publish\": 5, \"ack\": 2}}")
+                .on("/api/queues/%2F/CustomMail", "{\"messages\": 99, \"message_stats\": {\"publish\": 200, \"ack\": 101}}");
 
-        QueueDepth depth = new RabbitBrokerAdmin(http, customEndpoint).read();
+        QueueReading reading = new RabbitBrokerAdmin(http, customEndpoint).read();
 
-        assertEquals(99L, depth.main());
-        assertEquals(3L, depth.dlq());
+        assertEquals(99L, reading.main());
+        assertEquals(3L, reading.dlq());
+        assertEquals(200L, reading.enqueued());
+        assertEquals(101L, reading.acknowledged());
         // Verify correct queue names were requested
         assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("CustomMail")),
                 "should request the custom main queue");
@@ -87,13 +92,13 @@ class BrokerAdminTest {
     void rabbitFallsBackToDefaultWhenQueueNameIsBlank() throws Exception {
         BrokerEndpoint blankEndpoint = new BrokerEndpoint("broker.test", 15672, "u", "p", "");
         StubHttp http = new StubHttp()
-                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 7}")
-                .on("/api/queues/%2F/MailQueue", "{\"messages\": 42}");
+                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 7, \"message_stats\": {\"publish\": 10, \"ack\": 3}}")
+                .on("/api/queues/%2F/MailQueue", "{\"messages\": 42, \"message_stats\": {\"publish\": 100, \"ack\": 58}}");
 
-        QueueDepth depth = new RabbitBrokerAdmin(http, blankEndpoint).read();
+        QueueReading reading = new RabbitBrokerAdmin(http, blankEndpoint).read();
 
-        assertEquals(42L, depth.main());
-        assertEquals(7L, depth.dlq());
+        assertEquals(42L, reading.main());
+        assertEquals(7L, reading.dlq());
         // Verify default queue names were used
         assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("MailQueue")),
                 "should use default MailQueue when blank");
@@ -105,18 +110,39 @@ class BrokerAdminTest {
         // the broker declined to say, it did not say the queue is empty.
         StubHttp http = new StubHttp().on("/api/queues/", "{\"name\": \"MailQueue\"}");
 
-        QueueDepth depth = new RabbitBrokerAdmin(http, ENDPOINT).read();
+        QueueReading reading = new RabbitBrokerAdmin(http, ENDPOINT).read();
 
-        assertNull(depth.main());
-        assertNull(depth.dlq());
+        assertNull(reading.main());
+        assertNull(reading.dlq());
+        assertNull(reading.enqueued());
+        assertNull(reading.acknowledged());
+    }
+
+    @Test
+    void rabbitReturnsNullForCountersWhenMessageStatsNotCollectedYet() throws Exception {
+        // message_stats.publish and message_stats.ack may be absent before the management
+        // database has collected stats. Null, not zero.
+        StubHttp http = new StubHttp()
+                .on("/api/queues/%2F/MailQueueDLQ", "{\"messages\": 0}")
+                .on("/api/queues/%2F/MailQueue", "{\"messages\": 10}");
+
+        QueueReading reading = new RabbitBrokerAdmin(http, ENDPOINT).read();
+
+        assertEquals(10L, reading.main());
+        assertEquals(0L, reading.dlq());
+        assertNull(reading.enqueued());
+        assertNull(reading.acknowledged());
     }
 
     @Test
     void rabbitTreatsAMissingQueueAsZero() throws Exception {
-        QueueDepth depth = new RabbitBrokerAdmin(new StubHttp(), ENDPOINT).read();
+        QueueReading reading = new RabbitBrokerAdmin(new StubHttp(), ENDPOINT).read();
 
-        assertEquals(0L, depth.main());
-        assertEquals(0L, depth.dlq());
+        assertEquals(0L, reading.main());
+        assertEquals(0L, reading.dlq());
+        // Counters are null because broker gave no stats (missing queue, not just no messages)
+        assertNull(reading.enqueued());
+        assertNull(reading.acknowledged());
     }
 
     // ---------------------------------------------------------------- artemis
@@ -125,12 +151,15 @@ class BrokerAdminTest {
     void artemisSearchesForTheMBeanThenReadsIt() throws Exception {
         StubHttp http = new StubHttp()
                 .on("/console/jolokia/search/", "{\"value\": [\"org.apache.activemq.artemis:broker=\\\"0.0.0.0\\\"\"]}")
-                .on("/console/jolokia/read/", "{\"value\": 13}");
+                .on("MessageCount,MessagesAdded,MessagesAcknowledged",
+                    "{\"value\": {\"MessageCount\": 13, \"MessagesAdded\": 100, \"MessagesAcknowledged\": 87}}");
 
-        QueueDepth depth = new ArtemisBrokerAdmin(http, ENDPOINT).read();
+        QueueReading reading = new ArtemisBrokerAdmin(http, ENDPOINT).read();
 
-        assertEquals(13L, depth.main());
-        // Two calls per queue, main and DLQ.
+        assertEquals(13L, reading.main());
+        assertEquals(100L, reading.enqueued());
+        assertEquals(87L, reading.acknowledged());
+        // Two searches (one per queue) + two comma-joined reads (one per queue)
         assertEquals(4, http.calls.size());
         assertTrue(http.calls.get(0).toString().contains("search"));
     }
@@ -153,12 +182,15 @@ class BrokerAdminTest {
         StubHttp http = new StubHttp()
                 .on("MailQueueDLQ", "{\"value\": []}")
                 .on("/console/jolokia/search/", "{\"value\": [\"mbean\"]}")
-                .on("/console/jolokia/read/", "{\"value\": 5}");
+                .on("MessageCount,MessagesAdded,MessagesAcknowledged",
+                    "{\"value\": {\"MessageCount\": 5, \"MessagesAdded\": 50, \"MessagesAcknowledged\": 45}}");
 
-        QueueDepth depth = new ArtemisBrokerAdmin(http, ENDPOINT).read();
+        QueueReading reading = new ArtemisBrokerAdmin(http, ENDPOINT).read();
 
-        assertEquals(5L, depth.main());
-        assertEquals(0L, depth.dlq());
+        assertEquals(5L, reading.main());
+        assertEquals(0L, reading.dlq());
+        assertEquals(50L, reading.enqueued());
+        assertEquals(45L, reading.acknowledged());
     }
 
     @Test
@@ -168,12 +200,15 @@ class BrokerAdminTest {
                 .on("jms.queue.CustomMailDLQ", "{\"value\": []}")
                 .on("jms.queue.CustomMail", "{\"value\": [\"org.apache.activemq.artemis:broker=\\\"0.0.0.0\\\"\"]}")
                 .on("/console/jolokia/search/", "{\"value\": [\"mbean\"]}")
-                .on("/console/jolokia/read/", "{\"value\": 42}");
+                .on("MessageCount,MessagesAdded,MessagesAcknowledged",
+                    "{\"value\": {\"MessageCount\": 42, \"MessagesAdded\": 200, \"MessagesAcknowledged\": 158}}");
 
-        QueueDepth depth = new ArtemisBrokerAdmin(http, customEndpoint).read();
+        QueueReading reading = new ArtemisBrokerAdmin(http, customEndpoint).read();
 
-        assertEquals(42L, depth.main());
-        assertEquals(0L, depth.dlq());
+        assertEquals(42L, reading.main());
+        assertEquals(0L, reading.dlq());
+        assertEquals(200L, reading.enqueued());
+        assertEquals(158L, reading.acknowledged());
         // Verify custom queue names were used in the search patterns
         assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("jms.queue.CustomMail")),
                 "should request the custom main queue");
@@ -187,12 +222,13 @@ class BrokerAdminTest {
         StubHttp http = new StubHttp()
                 .on("jms.queue.MailQueueDLQ", "{\"value\": []}")
                 .on("/console/jolokia/search/", "{\"value\": [\"mbean\"]}")
-                .on("/console/jolokia/read/", "{\"value\": 13}");
+                .on("MessageCount,MessagesAdded,MessagesAcknowledged",
+                    "{\"value\": {\"MessageCount\": 13, \"MessagesAdded\": 100, \"MessagesAcknowledged\": 87}}");
 
-        QueueDepth depth = new ArtemisBrokerAdmin(http, blankEndpoint).read();
+        QueueReading reading = new ArtemisBrokerAdmin(http, blankEndpoint).read();
 
-        assertEquals(13L, depth.main());
-        assertEquals(0L, depth.dlq());
+        assertEquals(13L, reading.main());
+        assertEquals(0L, reading.dlq());
         // Verify default queue names were used
         assertTrue(http.calls.stream().anyMatch(uri -> uri.toString().contains("jms.queue.MailQueue")),
                 "should use default jms.queue.MailQueue when blank");

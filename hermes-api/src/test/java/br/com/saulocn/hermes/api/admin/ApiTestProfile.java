@@ -24,6 +24,9 @@ public class ApiTestProfile implements QuarkusTestProfile {
         config.put("hermes.broker.management-port", "1");
         config.put("hermes.broker.queue", "");
         config.put("hermes.enqueuer.url", "http://127.0.0.1:1");
+        // Disable caches in tests so that rapid seed-and-read operations don't hit stale data.
+        config.put("hermes.dashboard.rates-cache-ttl", "0");
+        config.put("hermes.dashboard.throughput-cache-ttl", "0");
         return config;
     }
 }

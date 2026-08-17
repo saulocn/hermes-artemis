@@ -42,5 +42,10 @@ class MailWriterAckIT {
 
         ids.forEach(id -> assertFalse(fixtures.isProcessed(id),
                 "recipient " + id + " was flagged processed even though the broker refused it"));
+
+        // Restates the loss-prevention invariant in the new column: published_on is null
+        // after a refused publish, confirming the row was never marked as sent to the broker.
+        ids.forEach(id -> assertFalse(fixtures.publishedAtOf(id) != null,
+                "recipient " + id + " has a non-null publishedAt even though the broker refused it"));
     }
 }

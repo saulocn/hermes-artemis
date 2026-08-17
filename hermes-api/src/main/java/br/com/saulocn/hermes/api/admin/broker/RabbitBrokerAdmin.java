@@ -37,20 +37,45 @@ public class RabbitBrokerAdmin implements BrokerAdmin {
     }
 
     @Override
-    public QueueDepth read() throws Exception {
-        return new QueueDepth(depthOf(mainQueue), depthOf(dlqQueue));
+    public QueueReading read() throws Exception {
+        QueueCounters main = readQueue(mainQueue);
+        QueueCounters dlq = readQueue(dlqQueue);
+        return new QueueReading(main.depth, dlq.depth, main.enqueued, main.acknowledged);
+    }
+
+    /** Cache of counters per queue. */
+    private record QueueCounters(Long depth, Long enqueued, Long acknowledged) {
     }
 
     /** %2F is the default vhost "/" — it has to stay percent-encoded in the path. */
-    private Long depthOf(String queue) throws Exception {
+    private QueueCounters readQueue(String queue) throws Exception {
         try {
             JsonObject body = http.get(URI.create(endpoint.baseUrl() + "/api/queues/%2F/" + queue),
                     endpoint.username(), endpoint.password(), Map.of());
+
             // Absent right after boot, before the management database has collected stats. Null
             // rather than zero: the broker declined to say, it did not say nothing is there.
-            return body.containsKey("messages") ? (long) body.getInt("messages") : null;
+            Long depth = body.containsKey("messages") ? (long) body.getInt("messages") : null;
+
+            // message_stats.publish and message_stats.ack are cumulative counters.
+            // Both are absent before the management database has collected stats.
+            // Null rather than zero: the broker declined to say, it did not say nothing is there.
+            Long enqueued = null;
+            Long acknowledged = null;
+
+            if (body.containsKey("message_stats")) {
+                JsonObject stats = body.getJsonObject("message_stats");
+                if (stats.containsKey("publish")) {
+                    enqueued = (long) stats.getInt("publish");
+                }
+                if (stats.containsKey("ack")) {
+                    acknowledged = (long) stats.getInt("ack");
+                }
+            }
+
+            return new QueueCounters(depth, enqueued, acknowledged);
         } catch (BrokerHttp.QueueNotFound e) {
-            return 0L;
+            return new QueueCounters(0L, null, null);
         }
     }
 }

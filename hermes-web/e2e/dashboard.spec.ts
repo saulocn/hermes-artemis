@@ -4,13 +4,13 @@ test('dashboard: stat cards and broker info', async ({ page }) => {
   await page.goto('/');
 
   // Verify page title
-  // By role and name: the Dashboard renders three <h2> (Painel, Broker de mensagens, Vazão…),
+  // By role and name: the Dashboard renders multiple <h2> (Painel, Vazão agora, Broker de mensagens, Vazão per minuto),
   // so a bare locator('h2') trips Playwright's strict mode.
   await expect(page.getByRole('heading', { name: 'Painel' })).toBeVisible();
 
-  // Five cards: the four recipient states, which partition the table, plus the message total.
-  // "Falhando" joined them when a failing delivery stopped being indistinguishable from a queued
-  // one; this spec still expected four and had been failing since.
+  // Five .stat-card elements: the four recipient states, which partition the table, plus the message total.
+  // "Falhando" joined them when a failing delivery stopped being indistinguishable from a queued one.
+  // The RateCard uses .rate-card class, not .stat-card, so this count remains 5.
   const statCards = page.locator('.stat-card');
   await expect(statCards).toHaveCount(5);
 
@@ -27,6 +27,25 @@ test('dashboard: stat cards and broker info', async ({ page }) => {
     const value = await card.locator('dd').textContent();
     expect(value).toBeTruthy();
     expect(/^\d+$/.test(value || '')).toBeTruthy();
+  }
+
+  // Check rate card (Vazão agora) with five rate cells
+  await expect(page.getByRole('heading', { name: 'Vazão agora' })).toBeVisible();
+  const rateCards = page.locator('.rate-card');
+  await expect(rateCards).toHaveCount(5);
+
+  const rateLabels = [
+    'Ingestão',
+    'Publicação',
+    'Entrega',
+    'Dreno da fila',
+    'Mais antigo não entregue',
+  ];
+  for (const label of rateLabels) {
+    const card = page.locator('.rate-card', { has: page.locator(`dt:has-text("${label}")`) });
+    await expect(card).toBeVisible();
+    const value = await card.locator('dd').textContent();
+    expect(value).toBeTruthy();
   }
 
   // Check broker card

@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Contract tests for the admin console endpoints. These tests verify:
@@ -312,5 +313,142 @@ public class AdminContractIT {
                 .then()
                 .statusCode(200)
                 .body("size", equalTo(200));
+    }
+
+    @Test
+    void ratesEndpointReturnsRatesPerStage() {
+        // Seed: POST a message with 2 recipients
+        String title = "Rates test " + UUID.randomUUID();
+        Map<String, Object> messagePayload = Map.of(
+                "title", title,
+                "text", "Test message for rates",
+                "contentType", "text/html",
+                "recipients", List.of(
+                        "rates-recipient1-" + UUID.randomUUID() + "@example.com",
+                        "rates-recipient2-" + UUID.randomUUID() + "@example.com"
+                )
+        );
+
+        given()
+                .contentType(ContentType.JSON)
+                .body(messagePayload)
+                .when()
+                .post("/message")
+                .then()
+                .statusCode(200);
+
+        // GET /admin/rates and assert HTTP 200 and structure
+        given()
+                .when()
+                .get("/admin/rates?window=30")
+                .then()
+                .statusCode(200)
+                .body("created", notNullValue())
+                .body("created.count", notNullValue())
+                .body("created.window", notNullValue())
+                .body("created.ratePerSecond", notNullValue())
+                .body("published", notNullValue())
+                .body("claimed", notNullValue())
+                .body("asOf", notNullValue());
+    }
+
+    @Test
+    void ratesWindowIsClamped() {
+        // GET /admin/rates?window=99999 should clamp to 3600
+        given()
+                .when()
+                .get("/admin/rates?window=99999")
+                .then()
+                .statusCode(200)
+                .body("created.window", equalTo(3600));
+
+        // GET /admin/rates?window=0 should clamp to 1
+        given()
+                .when()
+                .get("/admin/rates?window=0")
+                .then()
+                .statusCode(200)
+                .body("created.window", equalTo(1));
+    }
+
+    @Test
+    void throughputSeriesStructure() {
+        // Seed a message
+        String title = "Throughput test " + UUID.randomUUID();
+        given()
+                .contentType(ContentType.JSON)
+                .body(Map.of(
+                        "title", title,
+                        "text", "Test message for throughput",
+                        "contentType", "text/html",
+                        "recipients", List.of("throughput-" + UUID.randomUUID() + "@example.com")))
+                .when()
+                .post("/message")
+                .then()
+                .statusCode(200);
+
+        // GET /admin/throughput and verify series structure
+        given()
+                .when()
+                .get("/admin/throughput?minutes=60")
+                .then()
+                .statusCode(200)
+                .body("series", notNullValue())
+                .body("series.size()", greaterThan(0))
+                .body("series[0].stage", notNullValue())
+                .body("series[0].points", notNullValue())
+                .body("asOf", notNullValue());
+    }
+
+    @Test
+    void retryCleavesPublishedOnButNotClaimedOn() {
+        String email = "retry-published-test-" + UUID.randomUUID() + "@example.com";
+        seedRecipient(email);
+
+        // Get the recipient ID
+        Integer id = given()
+                .when()
+                .get("/admin/recipients?email=" + email)
+                .then()
+                .statusCode(200)
+                .extract().path("items[0].id");
+
+        // Mark it as failing (published but undelivered with failures)
+        markFailing(email, 1);
+
+        // Manually set published_on and claimed_on via direct DB update
+        // (simulating what the enqueuer and mailer do)
+        QuarkusTransaction.requiringNew().run(() -> em.createNativeQuery("""
+                update hermes.recipient
+                   set published_on = now() - make_interval(secs => :ago),
+                       claimed_on = now() - make_interval(secs => :ago)
+                 where recipient_id = :id
+                """)
+                .setParameter("id", id)
+                .setParameter("ago", 10)
+                .executeUpdate());
+
+        // Verify both are set before retry
+        em.clear();
+        Object[] before = (Object[]) em.createNativeQuery("""
+                select published_on, claimed_on from hermes.recipient where recipient_id = :id
+                """)
+                .setParameter("id", id)
+                .getSingleResult();
+        assertNotNull(before[0], "published_on should be set before retry");
+        assertNotNull(before[1], "claimed_on should be set before retry");
+
+        // POST /admin/recipients/{id}/retry
+        given().when().post("/admin/recipients/" + id + "/retry").then().statusCode(200);
+
+        // Verify published_on is cleared but claimed_on is not
+        em.clear();
+        Object[] after = (Object[]) em.createNativeQuery("""
+                select published_on, claimed_on from hermes.recipient where recipient_id = :id
+                """)
+                .setParameter("id", id)
+                .getSingleResult();
+        assertNull(after[0], "published_on should be cleared by retry");
+        assertNotNull(after[1], "claimed_on should NOT be cleared by retry");
     }
 }

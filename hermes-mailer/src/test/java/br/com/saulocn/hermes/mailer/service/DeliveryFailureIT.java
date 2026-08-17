@@ -18,6 +18,8 @@ import java.util.UUID;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * A send that throws has to leave two traces: the claim rolled back, and the attempt counted.
@@ -71,5 +73,10 @@ class DeliveryFailureIT {
         // again. A counted failure that also left the row claimed would be a lost mail.
         assertFalse(fixtures.isSent(recipient.getId()),
                 "a failed send must not leave the recipient claimed");
+
+        // Rollback of the delivery transaction also rolled back the claim timestamp,
+        // proving the invariant: claimedAt is null only when the send failed and rolled back.
+        assertNull(fixtures.claimedAtOf(recipient.getId()),
+                "claimedAt must be null after a failed send (the rollback took it)");
     }
 }

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { renderWithRouter, mockFetchRoutes, jsonResponse } from '../test/helpers';
-import { adminStats, brokerStatus, throughput } from '../test/fixtures';
+import { adminStats, brokerStatus, throughput, rates } from '../test/fixtures';
 
 describe('Dashboard page', () => {
   afterEach(() => {
@@ -18,6 +18,7 @@ describe('Dashboard page', () => {
     const fetchMock = mockFetchRoutes({
       '/api/admin/stats': { ...adminStats, inFlight: 5, failing: 2 },
       '/api/admin/broker': brokerStatus,
+      '/api/admin/rates': rates,
       '/api/admin/throughput': throughput,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -35,6 +36,7 @@ describe('Dashboard page', () => {
     const fetchMock = mockFetchRoutes({
       '/api/admin/stats': adminStats,
       '/api/admin/broker': brokerStatus,
+      '/api/admin/rates': rates,
       '/api/admin/throughput': throughput,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -60,6 +62,7 @@ describe('Dashboard page', () => {
     const fetchMock = mockFetchRoutes({
       '/api/admin/stats': adminStats,
       '/api/admin/broker': brokerStatus,
+      '/api/admin/rates': rates,
       '/api/admin/throughput': throughput,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -90,7 +93,8 @@ describe('Dashboard page', () => {
   it('displays queue and DLQ depth, with — when null', async () => {
     const fetchMock = mockFetchRoutes({
       '/api/admin/stats': adminStats,
-      '/api/admin/broker': { kind: 'artemis', queueDepth: null, dlqDepth: null, error: null },
+      '/api/admin/broker': { kind: 'artemis', queueDepth: null, dlqDepth: null, ackRate: null, error: null },
+      '/api/admin/rates': rates,
       '/api/admin/throughput': throughput,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -110,8 +114,10 @@ describe('Dashboard page', () => {
         kind: 'artemis',
         queueDepth: 5,
         dlqDepth: 0,
+        ackRate: 1.5,
         error: 'Broker connection failed',
       },
+      '/api/admin/rates': rates,
       '/api/admin/throughput': throughput,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -126,11 +132,41 @@ describe('Dashboard page', () => {
     expect(screen.getByText('Pendentes')).toBeInTheDocument();
   });
 
-  it('oneFailedCallFailsTheWholeDashboard_currentBehaviour', async () => {
+  it('one failing endpoint degrades only its own card with Promise.allSettled', async () => {
+    // Rates endpoint fails, but stats and broker should still render
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/admin/stats')) return jsonResponse(adminStats);
       if (url.includes('/api/admin/broker')) return jsonResponse(brokerStatus);
+      if (url.includes('/api/admin/rates')) {
+        return jsonResponse({}, { status: 500, ok: false });
+      }
+      if (url.includes('/api/admin/throughput')) return jsonResponse(throughput);
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Dashboard />);
+
+    // Rates endpoint error is shown
+    await waitFor(() => {
+      expect(screen.getByText(/status 500/)).toBeInTheDocument();
+    });
+
+    // But stats are still rendered
+    expect(screen.getByText('Pendentes')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();  // Pendentes value
+
+    // And broker is still rendered
+    expect(screen.getByText('artemis')).toBeInTheDocument();
+  });
+
+  it('throughput endpoint failure shows error banner while chart is hidden', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/admin/stats')) return jsonResponse(adminStats);
+      if (url.includes('/api/admin/broker')) return jsonResponse(brokerStatus);
+      if (url.includes('/api/admin/rates')) return jsonResponse(rates);
       if (url.includes('/api/admin/throughput')) {
         return jsonResponse({}, { status: 500, ok: false });
       }
@@ -140,13 +176,63 @@ describe('Dashboard page', () => {
 
     renderWithRouter(<Dashboard />);
 
-    // Promise.all rejects if any call fails, so whole panel shows error
+    // Throughput error is shown
     await waitFor(() => {
-      expect(screen.getByText(/status 500/)).toBeInTheDocument();
+      const errors = screen.getAllByText(/status 500/);
+      expect(errors.length).toBeGreaterThan(0);
     });
 
-    // Stats are NOT rendered because Promise.all failed
-    const pendingCard = screen.queryByText('Pendentes');
-    expect(pendingCard).not.toBeInTheDocument();
+    // But rates and stats are still rendered
+    expect(screen.getByText('Ingestão')).toBeInTheDocument();
+    expect(screen.getByText('Pendentes')).toBeInTheDocument();
+  });
+
+  it('renders rate card with stats and broker data', async () => {
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/stats': adminStats,
+      '/api/admin/broker': brokerStatus,
+      '/api/admin/rates': rates,
+      '/api/admin/throughput': throughput,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Vazão agora')).toBeInTheDocument();
+    });
+
+    // All five rate cells should be present
+    expect(screen.getByText('Ingestão')).toBeInTheDocument();
+    expect(screen.getByText('Publicação')).toBeInTheDocument();
+    expect(screen.getByText('Entrega')).toBeInTheDocument();
+    expect(screen.getByText('Dreno da fila')).toBeInTheDocument();
+    expect(screen.getByText('Mais antigo não entregue')).toBeInTheDocument();
+  });
+
+  it('stats failure shows error while rates and broker still render', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/admin/stats')) {
+        return jsonResponse({}, { status: 500, ok: false });
+      }
+      if (url.includes('/api/admin/broker')) return jsonResponse(brokerStatus);
+      if (url.includes('/api/admin/rates')) return jsonResponse(rates);
+      if (url.includes('/api/admin/throughput')) return jsonResponse(throughput);
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Dashboard />);
+
+    // Stats error is shown
+    await waitFor(() => {
+      const errors = screen.getAllByText(/status 500/);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    // But rate card and broker are still rendered
+    expect(screen.getByText('Vazão agora')).toBeInTheDocument();
+    expect(screen.getByText('artemis')).toBeInTheDocument();
   });
 });

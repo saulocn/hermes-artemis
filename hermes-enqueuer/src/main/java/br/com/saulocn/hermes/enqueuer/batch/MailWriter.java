@@ -9,6 +9,7 @@ import jakarta.enterprise.context.Dependent;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -49,7 +50,15 @@ public class MailWriter extends AbstractItemWriter {
         // reset `sent` to false. That lost update made rows look undelivered after the mail had
         // gone out, and the fallback job would then send a duplicate.
         List<Long> ids = payloads.stream().map(RecipientVO::getId).toList();
-        entityManager.createQuery("update Recipient r set r.processed = true where r.id in :ids")
+        // Take the timestamp in Java, not with SQL now(), because this chunk transaction has already
+        // waited up to hermes.enqueuer.ack-timeout-seconds (default 10) for broker acks before
+        // reaching this line. SQL now() is transaction_timestamp(), which would record the publish
+        // at chunk start, up to 10 seconds early, smearing a burst that lasts seconds across time.
+        // LocalDateTime.now() here is accurate. The whole chunk shares one timestamp: correct for
+        // per-minute buckets, slightly overstates instantaneous burst rate.
+        LocalDateTime publishedAt = LocalDateTime.now();
+        entityManager.createQuery("update Recipient r set r.processed = true, r.publishedAt = :publishedAt where r.id in :ids")
+                .setParameter("publishedAt", publishedAt)
                 .setParameter("ids", ids)
                 .executeUpdate();
 

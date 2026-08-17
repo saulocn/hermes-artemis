@@ -60,4 +60,10 @@ public class BatchFixtures {
         Recipient recipient = entityManager.find(Recipient.class, recipientId);
         return recipient != null && recipient.isProcessed();
     }
+
+    @Transactional
+    public LocalDateTime publishedAtOf(Long recipientId) {
+        Recipient recipient = entityManager.find(Recipient.class, recipientId);
+        return recipient != null ? recipient.getPublishedAt() : null;
+    }
 }

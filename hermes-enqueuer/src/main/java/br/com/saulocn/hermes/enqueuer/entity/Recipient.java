@@ -50,6 +50,24 @@ public class Recipient {
             columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
+    /**
+     * Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     */
+    @Column(name = "published_on")
+    private LocalDateTime publishedAt;
+
+    /**
+     * Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     */
+    @Column(name = "claimed_on")
+    private LocalDateTime claimedAt;
+
 
     public Recipient() {
     }
@@ -113,6 +131,14 @@ public class Recipient {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public LocalDateTime getClaimedAt() {
+        return claimedAt;
     }
 
     @Override

@@ -23,10 +23,25 @@ public class AdminResource {
     @Inject
     JobTriggerService jobs;
 
+    @org.eclipse.microprofile.config.inject.ConfigProperty(
+            name = "hermes.dashboard.publish-window-seconds")
+    int defaultPublishWindowSeconds;
+
     @GET
     @Path("/stats")
     public AdminVOs.Stats stats() {
         return dashboard.stats();
+    }
+
+    @GET
+    @Path("/rates")
+    public AdminVOs.Rates rates(@QueryParam("window") Integer windowSeconds) {
+        // The default is configuration, not a literal: it has to track the enqueuer's scheduler
+        // cycle, and @DefaultValue only takes compile-time constants. See the long note on
+        // hermes.dashboard.publish-window-seconds for why this is not the enqueuer's own property.
+        int window = windowSeconds == null ? defaultPublishWindowSeconds : windowSeconds;
+        // Bounded so a caller cannot ask for an arbitrarily long scan.
+        return dashboard.rates(Math.min(Math.max(window, 1), 3600));
     }
 
     @GET

@@ -17,7 +17,19 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporters: ['text', 'html'],
-      exclude: ['src/test/**', 'src/main.tsx', 'src/components/RichTextEditor.tsx'], // RichTextEditor uses ProseMirror which requires real layout, covered by Playwright instead
+      // `test.exclude` above keeps Playwright specs from being *run* here, but they were still
+      // counted in the coverage denominator at 0% — a runner grading itself on files it never
+      // executes. It cut both ways: it diluted real gaps under src/ by averaging them against
+      // dead weight, and it pushed the total to 80.11% against an 80% gate, so an honest test
+      // could have gone red for a reason with nothing to do with the code under test.
+      exclude: [
+        'e2e/**',
+        '*.config.*',
+        'src/test/**',
+        'src/main.tsx',
+        // ProseMirror needs real layout and will not mount under jsdom; covered by Playwright.
+        'src/components/RichTextEditor.tsx',
+      ],
       thresholds: {
         lines: 80,
         functions: 80,

@@ -4,6 +4,7 @@ import {
   CreateMessageResponse,
   JobTriggerResponse,
   MessagesPage,
+  RatesResponse,
   RecipientsPage,
   RetryResponse,
   ThroughputResponse,
@@ -22,14 +23,35 @@ export const brokerStatus: BrokerStatus = {
   kind: 'artemis',
   queueDepth: 5,
   dlqDepth: 0,
+  ackRate: 1.5,
   error: null,
 };
 
 export const throughput: ThroughputResponse = {
-  points: [
-    { minute: '2026-08-14T10:00:00Z', delivered: 4 },
-    { minute: '2026-08-14T10:01:00Z', delivered: 5 },
+  series: [
+    {
+      stage: 'created_on',
+      points: [
+        { minute: '2026-08-14T10:00:00Z', count: 4 },
+        { minute: '2026-08-14T10:01:00Z', count: 5 },
+      ],
+    },
+    {
+      stage: 'published_on',
+      points: [
+        { minute: '2026-08-14T10:00:00Z', count: 3 },
+        { minute: '2026-08-14T10:01:00Z', count: 4 },
+      ],
+    },
+    {
+      stage: 'claimed_on',
+      points: [
+        { minute: '2026-08-14T10:00:00Z', count: 2 },
+        { minute: '2026-08-14T10:01:00Z', count: 3 },
+      ],
+    },
   ],
+  asOf: '2026-08-14T10:02:00Z',
 };
 
 export const messagesPage: MessagesPage = {
@@ -79,4 +101,30 @@ export const jobTriggerResponse: JobTriggerResponse = {
 export const retryResponse: RetryResponse = {
   id: 9,
   retried: true,
+};
+
+export const rates: RatesResponse = {
+  created: {
+    count: 120,
+    window: 30,
+    span: 28,
+    ratePerSecond: 4.0,
+    sustainedPerSecond: 4.29,
+  },
+  published: {
+    count: 90,
+    window: 30,
+    span: 5,
+    ratePerSecond: 3.0,
+    sustainedPerSecond: 18.0,
+  },
+  claimed: {
+    count: 85,
+    window: 30,
+    span: 28,
+    ratePerSecond: 2.83,
+    sustainedPerSecond: 3.04,
+  },
+  lastPublishAt: '2026-08-14T10:02:05Z',
+  asOf: '2026-08-14T10:02:30Z',
 };

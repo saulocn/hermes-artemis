@@ -36,6 +36,14 @@ public class Recipient {
             columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
 
+    // When the recipient was published (moved to a queue). Written by bulk JPQL UPDATE, never through the entity.
+    @Column(name = "published_on")
+    private LocalDateTime publishedAt;
+
+    // When the recipient was claimed (in the delivery transaction). Written by bulk JPQL UPDATE, never through the entity.
+    @Column(name = "claimed_on")
+    private LocalDateTime claimedAt;
+
     public Recipient() {
     }
 
@@ -98,6 +106,14 @@ public class Recipient {
 
     public void setAttempts(int attempts) {
         this.attempts = attempts;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public LocalDateTime getClaimedAt() {
+        return claimedAt;
     }
 
     @Override

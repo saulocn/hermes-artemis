@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 
 @ApplicationScoped
@@ -71,8 +72,13 @@ public class MessageService {
         //
         // Claiming first also means a failed send rolls the claim back with the transaction,
         // so the message is redelivered rather than silently dropped.
+        // The claimedAt timestamp records when the claim was made. A committed claimedAt means
+        // the mail was accepted by SMTP, but note the instant is one round trip *before* the
+        // accept (we stamp it before the send). Do not compute send latency from this field.
         int claimed = entityManager.createQuery(
-                        "update Recipient r set r.sent = true where r.id = :id and r.sent = false")
+                        "update Recipient r set r.sent = true, r.claimedAt = :claimedAt "
+                      + "where r.id = :id and r.sent = false")
+                .setParameter("claimedAt", LocalDateTime.now())
                 .setParameter("id", recipientVO.getId())
                 .executeUpdate();
 

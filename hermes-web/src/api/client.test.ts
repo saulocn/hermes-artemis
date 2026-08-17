@@ -5,6 +5,7 @@ import {
   getAdminStats,
   getBrokerStatus,
   getMessages,
+  getRates,
   getRecipients,
   getThroughput,
   retryRecipient,
@@ -175,5 +176,44 @@ describe('api/client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(retryRecipient(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  describe('absent fields from the server', () => {
+    // JSON-B omits nulls, so an idle pipeline produces objects with keys simply missing. Every
+    // fixture in this suite was written with all fields present, which is why 175 green tests
+    // still shipped a dashboard that went blank on a real, idle server.
+    it('reads a rates response with span, sustained and lastPublishAt absent', async () => {
+      const idle = {
+        created: { count: 0, window: 30, ratePerSecond: 0 },
+        published: { count: 0, window: 30, ratePerSecond: 0 },
+        claimed: { count: 0, window: 30, ratePerSecond: 0 },
+        asOf: '2026-08-17T14:06:59',
+      };
+      vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(idle)));
+
+      const rates = await getRates(30);
+
+      expect(rates.created.span).toBeNull();
+      expect(rates.created.sustainedPerSecond).toBeNull();
+      expect(rates.lastPublishAt).toBeNull();
+    });
+
+    it('reads a broker status with ackRate and depths absent', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ kind: 'artemis' })));
+
+      const status = await getBrokerStatus();
+
+      expect(status.ackRate).toBeNull();
+      expect(status.queueDepth).toBeNull();
+      expect(status.error).toBeNull();
+    });
+
+    it('reads stats with oldestPendingSeconds absent', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+        pending: 0, inFlight: 0, failing: 0, delivered: 0, totalMessages: 0,
+      })));
+
+      expect((await getAdminStats()).oldestPendingSeconds).toBeNull();
+    });
   });
 });
