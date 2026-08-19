@@ -1,6 +1,6 @@
 package br.com.saulocn.hermes.enqueuer.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -10,8 +10,8 @@ import java.util.Objects;
 @Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
-    public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
-    public static final String FIND_NOT_SENT_MINUTES = "Message.FindNotSentMinutes";
+    public static final String FIND_NOT_PROCESSED = "Recipient.FindNotProcessed";
+    public static final String FIND_NOT_SENT_MINUTES = "Recipient.FindNotSentMinutes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
@@ -31,8 +31,42 @@ public class Recipient {
     @Column(name = "recipient_processed")
     private boolean processed;
 
-    @Column(name = "created_on")
+    /**
+     * Written by the mailer, read here.
+     *
+     * <p>Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     *
+     * <p>It is also what a republish policy would have to consult — today the fallback job puts a
+     * recipient that has failed ten times back on the queue exactly like one that has never been
+     * tried, and it could not tell them apart even if it wanted to.
+     */
+    @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
+    private int attempts;
+
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
+
+    /**
+     * Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     */
+    @Column(name = "published_on")
+    private LocalDateTime publishedAt;
+
+    /**
+     * Mapped even though this module never writes it, because the three modules all run
+     * {@code drop-and-create} against their own test database: a column missing from one of them
+     * means that module builds a different recipient table than the other two, and the difference
+     * only shows up when a query written against the real schema runs there.
+     */
+    @Column(name = "claimed_on")
+    private LocalDateTime claimedAt;
 
 
     public Recipient() {
@@ -87,12 +121,24 @@ public class Recipient {
         this.processed = processed;
     }
 
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public LocalDateTime getClaimedAt() {
+        return claimedAt;
     }
 
     @Override

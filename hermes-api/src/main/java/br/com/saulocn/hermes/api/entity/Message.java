@@ -3,10 +3,8 @@ package br.com.saulocn.hermes.api.entity;
 
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
-import javax.persistence.*;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(schema = "hermes", name = "message")
@@ -27,6 +25,17 @@ public class Message {
     @Column(name = "content_type")
     private String contentType;
 
+    // Mapped late: present in the DDL from the start but read by no entity, which is why the
+    // history screen could not order by time. columnDefinition keeps the NOW() default in the
+    // mapping — without it, any Hibernate-generated schema lands NULL.
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
+    private LocalDateTime createdAt;
+
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 
     public static Message of(MessageVO messageVO) {
         Message message = new Message();

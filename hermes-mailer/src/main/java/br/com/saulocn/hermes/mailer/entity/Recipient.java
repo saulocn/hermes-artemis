@@ -1,17 +1,13 @@
 package br.com.saulocn.hermes.mailer.entity;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@NamedQuery(name = Recipient.FIND_NOT_PROCESSED, query = "select r from Recipient r where r.processed = false")
-@NamedQuery(name = Recipient.FIND_NOT_SENT_MINUTES, query = "select r from Recipient r where r.createdAt < :dateLimitToSend AND r.sent = false")
 @Table(schema = "hermes", name = "recipient")
 public class Recipient {
 
-    public static final String FIND_NOT_PROCESSED = "Message.FindNotProcessed";
-    public static final String FIND_NOT_SENT_MINUTES = "Message.FindNotSentMinutes";
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "recipient_seq")
@@ -31,8 +27,22 @@ public class Recipient {
     @Column(name = "recipient_processed")
     private boolean processed;
 
-    @Column(name = "created_on")
+    // Written by the consumer in its own transaction, so a failed send leaves a trace even
+    // though the rollback undoes everything else. Zero means "never failed", not "never tried".
+    @Column(name = "recipient_attempts", columnDefinition = "int not null default 0")
+    private int attempts;
+
+    @Column(name = "created_on", insertable = false, updatable = false,
+            columnDefinition = "timestamp not null default now()")
     private LocalDateTime createdAt;
+
+    // When the recipient was published (moved to a queue). Written by bulk JPQL UPDATE, never through the entity.
+    @Column(name = "published_on")
+    private LocalDateTime publishedAt;
+
+    // When the recipient was claimed (in the delivery transaction). Written by bulk JPQL UPDATE, never through the entity.
+    @Column(name = "claimed_on")
+    private LocalDateTime claimedAt;
 
     public Recipient() {
     }
@@ -90,8 +100,20 @@ public class Recipient {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public LocalDateTime getClaimedAt() {
+        return claimedAt;
     }
 
     @Override

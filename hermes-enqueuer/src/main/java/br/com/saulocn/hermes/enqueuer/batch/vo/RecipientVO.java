@@ -1,9 +1,15 @@
 package br.com.saulocn.hermes.enqueuer.batch.vo;
 
-import javax.json.bind.JsonbBuilder;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class RecipientVO {
+
+    // One instance, not one per call. JsonbBuilder.create() builds a whole provider — discovery,
+    // class introspection, model construction — and Jsonb is documented as thread-safe and meant to
+    // be reused. This sits on the delivery path, which runs at ~1000/s. Do NOT close it.
+    private static final Jsonb JSONB = JsonbBuilder.create();
 
     private Long id;
     private String email;
@@ -66,10 +72,10 @@ public class RecipientVO {
     }
 
     public String toJSON() {
-        return JsonbBuilder.create().toJson(this);
+        return JSONB.toJson(this);
     }
 
     public static RecipientVO fromJSON(String json) {
-        return JsonbBuilder.create().fromJson(json, RecipientVO.class);
+        return JSONB.fromJson(json, RecipientVO.class);
     }
 }

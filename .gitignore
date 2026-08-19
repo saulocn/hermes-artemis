@@ -1,6 +1,18 @@
 **/node_modules/**
 package-lock.json
 
-**/application.properties
-hermes-mailer/src/main/resources/application.properties
-hermes-mailer/src/main/resources/application.compose.properties
+target/
+**/target/
+
+# Saídas de teste da tela
+coverage/
+playwright-report/
+test-results/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store

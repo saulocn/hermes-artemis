@@ -1,137 +1,290 @@
-version: "3.3"
+x-app-resources: &app-resources
+  limits:
+    cpus: '1'
+    memory: '1024M'
+  reservations:
+    cpus: '1'
+    memory: '512M'
+
+# Tela e cache fazem pouco; 0.5 CPU sobra para os dois.
+x-small-resources: &small-resources
+  limits:
+    cpus: '0.5'
+    memory: '512M'
+  reservations:
+    cpus: '0.5'
+    memory: '128M'
+
+# Broker e banco são compartilhados por todos os consumidores e foram medidos saturados a
+# 0.5 CPU: o broker chegava a ~108% da própria quota e a vazão travava em ~1200/s por mais
+# réplicas de mailer que se subisse. Com esta faixa o gargalo volta para os mailers e a
+# entrega passou de ~1200/s para 2308/s na mesma máquina.
+x-shared-resources: &shared-resources
+  limits:
+    cpus: '2'
+    memory: '1024M'
+  reservations:
+    cpus: '1'
+    memory: '256M'
+
+x-db-env: &db-env
+  DB_USERNAME: hermes
+  DB_PASSWORD: pass_hermes
+  DB_HOST: hermes-db
+  DB_NAME: hermes
+
+x-cache-env: &cache-env
+  CACHE_HOST: hermes-cache
+  CACHE_PORT: 6379
+
+x-mq-env: &mq-env
+  MQ_PORT: 5672
+  MQ_USERNAME: hermes
+  MQ_PASSWORD: pass_hermes
+
+x-mail-env: &mail-env
+  MAIL_MOCK: "true"
+  MAIL_FROM: somemail@outlook.com
+  MAIL_USERNAME: somemail@outlook.com
+  MAIL_PASSWORD: somepass
+  MAIL_SMTP: 'smtp-mail.outlook.com'
+  MAIL_PORT: '587'
+  MAIL_TLS: 'REQUIRED'
+  MAIL_SSL: 'false'
+
+# mp.config.profile is deliberately absent: there is no %compose.* property and no
+# application-compose.properties anywhere, so the flag this used to carry was a no-op.
+#
+# JVM flags, all measured rather than guessed (see the "JVM" section of the README):
+#   MaxRAMPercentage=70   the default is 25, so a 1 GiB container ran on a 256 MB heap and
+#                         the mailer died with OutOfMemoryError draining a backlog.
+#   UseG1GC               under 1792 MB the JVM picks SerialGC by ergonomics; its full
+#                         stop-the-world collections pegged the single CPU at 99%.
+#   ActiveProcessorCount  the container sees 10 CPUs because `cpus: 1` is a quota, not a
+#                         cpuset — Vert.x and the GC sized their pools for hardware the
+#                         process never gets. Pin it to the quota.
+#   HeapDump*             next OOM leaves evidence. NOTE: this comment used to claim
+#                         ExitOnOutOfMemoryError came from the base image. It does not — checked
+#                         against /proc/1/cmdline on a running mailer, which carries only the
+#                         flags listed here. A load test proved the cost: the mailer took ten
+#                         OutOfMemoryErrors, one of them from the Transaction Reaper thread, and
+#                         stayed up for hours serving requests with its timeout enforcement dead.
+#                         It is set explicitly below now, so the container dies and restart:always
+#                         brings back a healthy one.
+#   ExitOnOutOfMemory     see above. A process that has lost the reaper is worse than a missing
+#                         one, because nothing reports it as unhealthy.
+x-java-options: &java-options
+  JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -XX:MaxRAMPercentage=70 -XX:+UseG1GC -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -XX:+ExitOnOutOfMemoryError"
+
+x-java-health: &java-health
+  test: ["CMD", "curl", "-f", "http://localhost:8080/q/health/ready"]
+  interval: 15s
+  timeout: 5s
+  retries: 10
+  start_period: 30s
+
+x-api-base: &api-base
+  build:
+    context: ./hermes-api/
+    dockerfile: ./src/main/docker/Dockerfile.jvm
+  image: saulocn/hermes-api
+  deploy:
+    resources: *app-resources
+  ports:
+    - 8080:8080
+  restart: always
+  healthcheck: *java-health
+
+x-enqueuer-base: &enqueuer-base
+  build:
+    context: ./hermes-enqueuer/
+    dockerfile: ./src/main/docker/Dockerfile.jvm
+  image: saulocn/hermes-enqueuer
+  deploy:
+    resources: *app-resources
+  ports:
+    - 8082:8082
+  restart: always
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8082/q/health/ready"]
+    interval: 15s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+
+x-mailer-base: &mailer-base
+  build:
+    context: ./hermes-mailer/
+    dockerfile: ./src/main/docker/Dockerfile.jvm
+  image: saulocn/hermes-mailer
+  deploy:
+    resources: *app-resources
+  restart: always
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
+    interval: 15s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+
 services:
   hermes-db:
     build:
-      context: ./db/  
+      context: ./db/
     image: saulocn/hermes-pg
     deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: '512M'
-        reservations:
-          cpus: '0.5'
-          memory: '128M'
+      resources: *shared-resources
     ports:
       - 5432:5432
     environment:
-        PGUSER: hermes
-        POSTGRES_USER: hermes
-        POSTGRES_PASSWORD: pass_hermes
-        POSTGRES_DB: hermes
+      PGUSER: hermes
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: pass_hermes
+      POSTGRES_DB: hermes
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  hermes-cache:
+    build:
+      context: ./cache/
+    image: saulocn/hermes-cache
+    deploy:
+      resources: *small-resources
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # The console is broker-agnostic, so it has no profile and serves both.
+  hermes-web:
+    build:
+      context: ./hermes-web/
+    image: saulocn/hermes-web
+    deploy:
+      resources: *small-resources
+    ports:
+      - 8090:80
+    restart: always
+
+  # hermes-api has one variant per profile: it reads queue depth straight from the broker's
+  # management API, so it needs to know which one is running.
+  hermes-api:
+    <<: *api-base
+    profiles: ["artemis"]
+    environment:
+      <<: [*java-options, *db-env, *cache-env, *mq-env]
+      BROKER_KIND: artemis
+      BROKER_HOST: hermes-mq
+      BROKER_MGMT_PORT: 8161
+      ENQUEUER_URL: http://enqueuer:8082
+    depends_on:
+      - hermes-db
+      - hermes-cache
+
+  hermes-api-rabbit:
+    <<: *api-base
+    profiles: ["rabbit"]
+    environment:
+      <<: [*java-options, *db-env, *cache-env, *mq-env]
+      BROKER_KIND: rabbit
+      BROKER_HOST: hermes-rabbit
+      BROKER_MGMT_PORT: 15672
+      ENQUEUER_URL: http://enqueuer-rabbit:8082
+    # hermes-web's nginx proxies to the name "hermes-api" and resolves it at startup, so this
+    # variant answers to that name too instead of the console needing per-profile config.
+    networks:
+      default:
+        aliases:
+          - hermes-api
+    depends_on:
+      - hermes-db
+      - hermes-cache
+
   hermes-mq:
+    profiles: ["artemis"]
+    # Imagem base só-amd64; declarado para o compose não avisar a cada subida em arm64.
+    platform: linux/amd64
     build:
       context: ./artemis/
     image: saulocn/hermes-mq
     deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: '512M'
-        reservations:
-          cpus: '0.5'
-          memory: '128M'
+      resources: *shared-resources
     ports:
       - 8161:8161
     environment:
-        ARTEMIS_BROKER: hermes
-        ARTEMIS_USER: hermes
-        ARTEMIS_PASSWORD: pass_hermes
+      ARTEMIS_BROKER: hermes
+      ARTEMIS_USER: hermes
+      ARTEMIS_PASSWORD: pass_hermes
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8161"]
       interval: 1m30s
       timeout: 5s
       retries: 5
-  hermes-api:
-    build:
-      context: ./hermes-api/
-      dockerfile: ./src/main/docker/Dockerfile.jvm
-    image: saulocn/hermes-api
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: '1024M'
-        reservations:
-          cpus: '1'
-          memory: '512M'
-    ports:
-      - 8080:8080
-    environment:
-        JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
-        DB_USERNAME: hermes
-        DB_PASSWORD: pass_hermes
-        DB_HOST: hermes-db
-        DB_NAME: hermes
-    restart: always
-    depends_on:
-        - hermes-db
-        - hermes-mq
-  enqueuer:
-    build:
-      context: ./hermes-enqueuer/
-      dockerfile: ./src/main/docker/Dockerfile.jvm
-    image: saulocn/hermes-enqueuer
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: '1024M'
-        reservations:
-          cpus: '1'
-          memory: '512M'
-    environment:
-        JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
-        DB_USERNAME: hermes
-        DB_PASSWORD: pass_hermes
-        DB_HOST: hermes-db
-        DB_NAME: hermes
-        MQ_HOST: hermes-mq
-        MQ_PORT: 5672
-        MQ_USERNAME: hermes
-        MQ_PASSWORD: pass_hermes
-    restart: always
-    depends_on:
-        - hermes-db
-        - hermes-mq
-  mailer:
-    build:
-      context: ./hermes-mailer/
-      dockerfile: ./src/main/docker/Dockerfile.jvm
-    image: saulocn/hermes-mailer
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: '1024M'
-        reservations:
-          cpus: '1'
-          memory: '512M'
-    environment:
-        JAVA_OPTIONS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dmp.config.profile=compose"
-        DB_USERNAME: hermes
-        DB_PASSWORD: pass_hermes
-        DB_HOST: hermes-db
-        DB_NAME: hermes
-        MQ_HOST: hermes-mq
-        MQ_PORT: 5672
-        MQ_USERNAME: hermes
-        MQ_PASSWORD: pass_hermes
-        MAIL_MOCK: "true"
-        MAIL_FROM: somemail@outlook.com
-        MAIL_USERNAME: somemail@outlook.com
-        MAIL_PASSWORD: somepass
-        MAIL_SMTP: 'smtp-mail.outlook.com'
-        MAIL_PORT: '587'
-        MAIL_TLS: 'REQUIRED'
-        MAIL_SSL: 'false'
-    restart: always
-    depends_on:
-        - hermes-db
-        - hermes-mq
 
+  hermes-rabbit:
+    profiles: ["rabbit"]
+    build:
+      context: ./rabbit/
+    image: saulocn/hermes-rabbit
+    deploy:
+      resources: *shared-resources
+    ports:
+      - 15672:15672
+      - 5672:5672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  enqueuer:
+    <<: *enqueuer-base
+    profiles: ["artemis"]
+    environment:
+      <<: [*java-options, *db-env, *mq-env]
+      MQ_HOST: hermes-mq
+    depends_on:
+      - hermes-db
+      - hermes-mq
+
+  enqueuer-rabbit:
+    <<: *enqueuer-base
+    profiles: ["rabbit"]
+    environment:
+      <<: [*java-options, *db-env, *mq-env]
+      MQ_HOST: hermes-rabbit
+      MQ_MAIL_ADDRESS: /queues/MailQueue
+    depends_on:
+      - hermes-db
+      - hermes-rabbit
+
+  mailer:
+    <<: *mailer-base
+    profiles: ["artemis"]
+    environment:
+      <<: [*java-options, *db-env, *cache-env, *mq-env, *mail-env]
+      MQ_HOST: hermes-mq
+    depends_on:
+      - hermes-db
+      - hermes-mq
+      - hermes-cache
+
+  mailer-rabbit:
+    <<: *mailer-base
+    profiles: ["rabbit"]
+    environment:
+      <<: [*java-options, *db-env, *cache-env, *mq-env, *mail-env]
+      MQ_HOST: hermes-rabbit
+      MQ_MAIL_ADDRESS: /queues/MailQueue
+      CACHE_HOST: hermes-cache
+      CACHE_PORT: 6379
+    depends_on:
+      - hermes-db
+      - hermes-cache
+      - hermes-rabbit

@@ -1,0 +1,67 @@
+package br.com.saulocn.hermes.enqueuer.batch;
+
+import br.com.saulocn.hermes.enqueuer.batch.vo.RecipientVO;
+import br.com.saulocn.hermes.enqueuer.entity.Recipient;
+import org.jboss.logging.Logger;
+
+import jakarta.batch.api.chunk.AbstractItemWriter;
+import jakarta.enterprise.context.Dependent;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.persistence.EntityManager;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Publishes a chunk of recipients and only then records that they were processed.
+ *
+ * <p>Both batch jobs use this one writer. They used to have a writer each, differing in the
+ * channel name and a log prefix — and the two channels resolved to the same address.
+ */
+@Dependent
+@Named
+public class MailWriter extends AbstractItemWriter {
+
+    @Inject
+    Logger log;
+
+    @Inject
+    EntityManager entityManager;
+
+    @Inject
+    RecipientPublisher publisher;
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void writeItems(List<Object> list) throws Exception {
+        List<Recipient> recipients = (List<Recipient>) (List<?>) list;
+
+        List<RecipientVO> payloads = recipients.stream()
+                .map(r -> new RecipientVO(r.getId(), r.getEmail(), r.getMessageId()))
+                .toList();
+
+        // Throws unless the broker took every one; JBeret then rolls the chunk back and the
+        // update below never runs. That ordering is the whole invariant.
+        publisher.publishAll(payloads);
+
+        // A targeted update, not find()+merge(). The reader loads these entities at the start of
+        // the chunk, and the mailer can flip `sent` on the same rows while we wait for acks;
+        // merging the entity would write the whole row back from a stale first-level cache and
+        // reset `sent` to false. That lost update made rows look undelivered after the mail had
+        // gone out, and the fallback job would then send a duplicate.
+        List<Long> ids = payloads.stream().map(RecipientVO::getId).toList();
+        // Take the timestamp in Java, not with SQL now(), because this chunk transaction has already
+        // waited up to hermes.enqueuer.ack-timeout-seconds (default 10) for broker acks before
+        // reaching this line. SQL now() is transaction_timestamp(), which would record the publish
+        // at chunk start, up to 10 seconds early, smearing a burst that lasts seconds across time.
+        // LocalDateTime.now() here is accurate. The whole chunk shares one timestamp: correct for
+        // per-minute buckets, slightly overstates instantaneous burst rate.
+        LocalDateTime publishedAt = LocalDateTime.now();
+        entityManager.createQuery("update Recipient r set r.processed = true, r.publishedAt = :publishedAt where r.id in :ids")
+                .setParameter("publishedAt", publishedAt)
+                .setParameter("ids", ids)
+                .executeUpdate();
+
+        log.debugf("Sent chunk of %d recipients to queue", ids.size());
+    }
+}

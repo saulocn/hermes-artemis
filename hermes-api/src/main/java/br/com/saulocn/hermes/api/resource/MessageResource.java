@@ -6,11 +6,11 @@ import br.com.saulocn.hermes.api.service.MessageService;
 import br.com.saulocn.hermes.api.service.vo.MailVO;
 import org.jboss.logging.Logger;
 
-import javax.inject.Inject;
-import javax.transaction.Transactional;
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.util.List;
 
 @Path("/message")

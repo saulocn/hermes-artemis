@@ -3,10 +3,16 @@ package br.com.saulocn.hermes.api.service.vo;
 import br.com.saulocn.hermes.api.entity.Message;
 import br.com.saulocn.hermes.api.resource.request.MessageVO;
 
-import javax.json.bind.JsonbBuilder;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 import java.util.Objects;
 
 public class MailVO {
+
+    // One instance, not one per call. JsonbBuilder.create() builds a whole provider — discovery,
+    // class introspection, model construction — and Jsonb is documented as thread-safe and meant to
+    // be reused. This sits on the delivery path, which runs at ~1000/s. Do NOT close it.
+    private static final Jsonb JSONB = JsonbBuilder.create();
 
     private Long messageId;
     private String subject;
@@ -68,10 +74,28 @@ public class MailVO {
     }
 
     public String toJSON() {
-        return JsonbBuilder.create().toJson(this);
+        return JSONB.toJson(this);
     }
 
     public static MailVO fromJSON(String json) {
-        return JsonbBuilder.create().fromJson(json, MailVO.class);
+        return JSONB.fromJson(json, MailVO.class);
+    }
+
+    /**
+     * Returns a log-safe representation that redacts personal data.
+     * This toString() MUST NOT leak message content.
+     * The text length is sufficient for operational logging.
+     * Do NOT "improve" this by adding the full text back — the whole point
+     * is that safe objects cannot leak no matter who logs them.
+     */
+    @Override
+    public String toString() {
+        String textLength = text != null ? String.format("<%d chars>", text.length()) : "<null>";
+        return "MailVO{" +
+                "messageId=" + messageId +
+                ", subject='" + subject + '\'' +
+                ", text=" + textLength +
+                ", contentType='" + contentType + '\'' +
+                '}';
     }
 }
