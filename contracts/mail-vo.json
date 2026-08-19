@@ -1,0 +1,6 @@
+{
+  "messageId": 7,
+  "subject": "Assunto do teste",
+  "text": "<p>Corpo do teste</p>",
+  "contentType": "text/html"
+}

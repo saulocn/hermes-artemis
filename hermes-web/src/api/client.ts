@@ -257,8 +257,16 @@ export interface JobTriggerResponse {
   executionId: number;
 }
 
-/** The two jobs, named once. The server derives its own paths from the same two words. */
-export type JobName = 'enqueue' | 'fallback';
+/**
+ * The two jobs, named once. The server derives its own paths from the same two words. Keeping
+ * the list in one place stops the client from accepting job names the server doesn't recognise
+ * (or vice versa). The type is derived from this constant, just like RecipientState is derived
+ * from RECIPIENT_STATES — see commit e1da578: when `fallback` was added to only one of the
+ * three places that named it, a typo would trigger the enqueue path instead.
+ */
+export const JOB_NAMES = ['enqueue', 'fallback'] as const;
+
+export type JobName = (typeof JOB_NAMES)[number];
 
 /**
  * A refused trigger is an outcome, not a failure.

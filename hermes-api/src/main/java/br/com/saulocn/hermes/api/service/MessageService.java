@@ -18,7 +18,23 @@ import java.util.List;
 @ApplicationScoped
 public class MessageService {
 
-    private static final String TTL_IN_SECONDS = "30";
+    /**
+     * Redis cache TTL for message objects, in seconds.
+     * Source of truth: contracts/message-cache.properties (ttl.seconds=30).
+     * Must match the configuration to prevent tests from diverging.
+     */
+    static String getMessageCacheTtl() {
+        return "30";
+    }
+
+    /**
+     * Redis cache key format for message objects.
+     * Source of truth: contracts/message-cache.properties (key.format=message_%d).
+     * The %d is substituted with the message ID.
+     */
+    static String getMessageKeyFormat() {
+        return "message_%d";
+    }
     @Inject
     EntityManager em;
 
@@ -43,11 +59,11 @@ public class MessageService {
     private void setToCache(MailVO mailVO) {
         String cacheKey = getMessageKey(mailVO.getMessageId());
         redisClient.set(Arrays.asList(cacheKey, mailVO.toJSON()));
-        redisClient.expire(cacheKey, TTL_IN_SECONDS);
+        redisClient.expire(cacheKey, getMessageCacheTtl());
     }
 
     private String getMessageKey(Long messageId) {
-        return String.format("message_%d",messageId);
+        return String.format(getMessageKeyFormat(), messageId);
     }
 
     public List<Message> listMail() {

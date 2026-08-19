@@ -17,7 +17,12 @@ import java.util.Arrays;
 @ApplicationScoped
 public class MessageService {
 
-    private static final String TTL_IN_SECONDS = "30";
+    /**
+     * TTL for message cache entries in Redis, in seconds. Frozen in {@code contracts/message-cache.properties}
+     * (ttl.seconds=30) to ensure api and mailer agree. A test reading the properties file is the
+     * contract guard that keeps the two sides aligned.
+     */
+    static final String TTL_IN_SECONDS = "30";
 
     @Inject
     Logger log;
@@ -116,7 +121,7 @@ public class MessageService {
     }
 
     private MailVO findInCache(Long messageId) {
-        Response response = redisClient.get(getMessageKey(messageId));
+        Response response = redisClient.get(MessageService.getMessageKey(messageId));
         if(response==null){
             return null;
         }
@@ -124,15 +129,20 @@ public class MessageService {
         return MailVO.fromJSON(mailVOJSON);
     }
 
-    private String getMessageKey(Long messageId) {
-        return String.format("message_%d",messageId);
+    /**
+     * Redis key format for message cache entries. Frozen in {@code contracts/message-cache.properties}
+     * (key.format=message_%d) to ensure api and mailer agree. A test reading the properties file is
+     * the contract guard that keeps the two sides aligned.
+     */
+    static String getMessageKey(Long messageId) {
+        return String.format("message_%d", messageId);
     }
 
 
     private void setToCache(MailVO mailVO) {
-        String cacheKey = getMessageKey(mailVO.getMessageId());
+        String cacheKey = MessageService.getMessageKey(mailVO.getMessageId());
         redisClient.set(Arrays.asList(cacheKey, mailVO.toJSON()));
-        redisClient.expire(cacheKey, TTL_IN_SECONDS);
+        redisClient.expire(cacheKey, MessageService.TTL_IN_SECONDS);
     }
 
 

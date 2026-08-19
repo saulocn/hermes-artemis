@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   ApiError,
   createMessage,
@@ -10,6 +12,8 @@ import {
   getThroughput,
   retryRecipient,
   triggerJob,
+  RECIPIENT_STATES,
+  JOB_NAMES,
 } from './client';
 
 function jsonResponse(body: unknown, init: { status?: number; ok?: boolean } = {}) {
@@ -214,6 +218,36 @@ describe('api/client', () => {
       })));
 
       expect((await getAdminStats()).oldestPendingSeconds).toBeNull();
+    });
+  });
+
+  describe('contract validation', () => {
+    // These tests ensure the code and the server stay in sync by reading a shared contract file.
+    // When commit e1da578 shipped, `failing` existed in the dashboard count but not in the filter,
+    // because the list of states was repeated in three places and diverged in two of them. The
+    // symptom was a screen showing "10 recipients failing" with no way to view them.
+
+    it('verifies RECIPIENT_STATES values match contracts/recipient-states.json', () => {
+      const contractPath = resolve(__dirname, '../../../contracts/recipient-states.json');
+      const contractContent = readFileSync(contractPath, 'utf-8');
+      const expectedStates: string[] = JSON.parse(contractContent);
+
+      const actualStates = RECIPIENT_STATES.map((state) => state.value);
+
+      expect(actualStates).toEqual(expectedStates);
+    });
+
+    // Same logic as recipient states: the two job names are used to build URLs on both client
+    // and server. If they diverge, triggerJob might send the client to a 404 or the UI might
+    // render an option the server doesn't accept.
+    it('verifies JOB_NAMES values match contracts/jobs.json', () => {
+      const contractPath = resolve(__dirname, '../../../contracts/jobs.json');
+      const contractContent = readFileSync(contractPath, 'utf-8');
+      const expectedJobs: string[] = JSON.parse(contractContent);
+
+      const actualJobs = Array.from(JOB_NAMES);
+
+      expect(actualJobs).toEqual(expectedJobs);
     });
   });
 });

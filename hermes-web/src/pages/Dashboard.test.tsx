@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { renderWithRouter, mockFetchRoutes, jsonResponse } from '../test/helpers';
-import { adminStats, brokerStatus, throughput, rates } from '../test/fixtures';
+import { adminStats, brokerStatus, throughput, rates, idleRates } from '../test/fixtures';
 
 describe('Dashboard page', () => {
   afterEach(() => {
@@ -234,5 +234,33 @@ describe('Dashboard page', () => {
     // But rate card and broker are still rendered
     expect(screen.getByText('Vazão agora')).toBeInTheDocument();
     expect(screen.getByText('artemis')).toBeInTheDocument();
+  });
+
+  it('renders rate card with idle pipeline (absent fields normalised to null)', async () => {
+    // An idle pipeline omits span and sustainedPerSecond from the server response. The client's
+    // orNull normaliser converts these absent fields to null so downstream code sees the declared
+    // types, not undefined. This test exercises the real shape: the server never sends a rates
+    // response with every field present unless messages are actually flowing.
+    const fetchMock = mockFetchRoutes({
+      '/api/admin/stats': adminStats,
+      '/api/admin/broker': brokerStatus,
+      '/api/admin/rates': idleRates,
+      '/api/admin/throughput': throughput,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithRouter(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Vazão agora')).toBeInTheDocument();
+    });
+
+    // All five rate cells should render without errors, even though span and sustainedPerSecond
+    // are absent from the server response and normalised to null.
+    expect(screen.getByText('Ingestão')).toBeInTheDocument();
+    expect(screen.getByText('Publicação')).toBeInTheDocument();
+    expect(screen.getByText('Entrega')).toBeInTheDocument();
+    expect(screen.getByText('Dreno da fila')).toBeInTheDocument();
+    expect(screen.getByText('Mais antigo não entregue')).toBeInTheDocument();
   });
 });

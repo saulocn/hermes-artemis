@@ -128,3 +128,37 @@ export const rates: RatesResponse = {
   lastPublishAt: '2026-08-14T10:02:05Z',
   asOf: '2026-08-14T10:02:30Z',
 };
+
+/**
+ * An idle pipeline as the server produces it: JSON-B omits null fields entirely, so the server
+ * sends objects with only `count`, `window`, and `ratePerSecond`. The keys `span`,
+ * `sustainedPerSecond`, and `lastPublishAt` are absent entirely (not null). When parsed from JSON,
+ * these become `undefined` in JavaScript. The client's `orNull` function normalises `undefined ?? null`
+ * at the boundary to keep the types true downstream.
+ *
+ * This type describes the wire format (missing fields), not the normalised form (null values).
+ * That distinction is load-bearing: the historical fixture with every field present couldn't catch
+ * the bug, because `undefined !== null` was true and `.toFixed()` on undefined crashed the page.
+ */
+type RawStageRate = {
+  count: number;
+  window: number;
+  ratePerSecond: number;
+  span?: number;
+  sustainedPerSecond?: number;
+};
+
+type RawRatesResponse = {
+  created: RawStageRate;
+  published: RawStageRate;
+  claimed: RawStageRate;
+  lastPublishAt?: string;
+  asOf: string;
+};
+
+export const idleRates: RawRatesResponse = {
+  created: { count: 0, window: 30, ratePerSecond: 0 },
+  published: { count: 0, window: 30, ratePerSecond: 0 },
+  claimed: { count: 0, window: 30, ratePerSecond: 0 },
+  asOf: '2026-08-14T10:02:30Z',
+};

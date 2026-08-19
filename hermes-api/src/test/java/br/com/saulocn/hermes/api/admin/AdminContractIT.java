@@ -9,6 +9,9 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -450,5 +453,90 @@ public class AdminContractIT {
                 .getSingleResult();
         assertNull(after[0], "published_on should be cleared by retry");
         assertNotNull(after[1], "claimed_on should NOT be cleared by retry");
+    }
+
+    /**
+     * RecipientState.wireNames() returns exactly the list from contracts/recipient-states.json,
+     * in the same order. This guards against inconsistencies between the enum and the contract.
+     */
+    @Test
+    void recipientStateWireNamesMatchContract() throws IOException {
+        // Read the contract file
+        Path contractPath = Path.of("..").resolve("contracts").resolve("recipient-states.json")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.exists(contractPath),
+                "Contract file not found at " + contractPath);
+        String contractContent = Files.readString(contractPath);
+
+        // Simple JSON array parsing: ["pending", "inFlight", "failing", "delivered"]
+        List<String> contractStates = parseJsonArray(contractContent);
+        assertFalse(contractStates.isEmpty(),
+                "Contract should define at least one recipient state");
+
+        // Compare with enum
+        List<String> actualStates = RecipientState.wireNames();
+        assertEquals(contractStates, actualStates,
+                "RecipientState.wireNames() should match contract exactly. " +
+                "Expected: " + contractStates + ", got: " + actualStates);
+    }
+
+    /**
+     * The job paths exposed by AdminResource (@POST @Path("/jobs/{job}"))
+     * are exactly those in contracts/jobs.json. Uses HTTP requests to verify
+     * the routes exist (non-404 response means the route is recognized).
+     *
+     * <p>This test hits the endpoints to verify they exist, rather than using reflection.
+     * A route exists if POST returns something other than 404 (409/502 are valid responses
+     * indicating the route exists but the operation failed, which is fine for this test).
+     */
+    @Test
+    void jobPathsMatchContract() throws IOException {
+        // Read the contract file
+        Path contractPath = Path.of("..").resolve("contracts").resolve("jobs.json")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.exists(contractPath),
+                "Contract file not found at " + contractPath);
+        String contractContent = Files.readString(contractPath);
+
+        // Parse job names
+        List<String> contractJobs = parseJsonArray(contractContent);
+        assertFalse(contractJobs.isEmpty(),
+                "Contract should define at least one job");
+
+        // For each job in the contract, verify the endpoint exists
+        for (String job : contractJobs) {
+            int statusCode = given()
+                    .when()
+                    .post("/admin/jobs/" + job)
+                    .then()
+                    .extract()
+                    .statusCode();
+
+            // 404 means the route does not exist; anything else means it does.
+            // 409 = already running, 502 = unreachable, 200 = success, etc.
+            assertNotEquals(404, statusCode,
+                    "Job endpoint /admin/jobs/" + job + " should exist (got 404)");
+        }
+    }
+
+    /**
+     * Simple JSON array parser for ["item1", "item2", ...] format.
+     * Splits on comma and extracts quoted strings.
+     */
+    private List<String> parseJsonArray(String json) {
+        List<String> result = new java.util.ArrayList<>();
+        // Remove outer brackets and whitespace
+        json = json.trim();
+        if (json.startsWith("[")) json = json.substring(1);
+        if (json.endsWith("]")) json = json.substring(0, json.length() - 1);
+
+        // Split and extract quoted strings
+        for (String item : json.split(",")) {
+            item = item.trim();
+            if (item.startsWith("\"") && item.endsWith("\"")) {
+                result.add(item.substring(1, item.length() - 1));
+            }
+        }
+        return result;
     }
 }
