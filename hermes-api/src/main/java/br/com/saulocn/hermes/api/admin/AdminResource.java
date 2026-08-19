@@ -18,6 +18,9 @@ public class AdminResource {
     DashboardService dashboard;
 
     @Inject
+    RecipientRollup rollup;
+
+    @Inject
     BrokerAdminService broker;
 
     @Inject
@@ -41,14 +44,14 @@ public class AdminResource {
         // hermes.dashboard.publish-window-seconds for why this is not the enqueuer's own property.
         int window = windowSeconds == null ? defaultPublishWindowSeconds : windowSeconds;
         // Bounded so a caller cannot ask for an arbitrarily long scan.
-        return dashboard.rates(Math.min(Math.max(window, 1), 3600));
+        return rollup.rates(Math.min(Math.max(window, 1), 3600));
     }
 
     @GET
     @Path("/throughput")
     public AdminVOs.Throughput throughput(@QueryParam("minutes") @DefaultValue("60") int minutes) {
         // Bounded so a caller cannot ask for an arbitrarily long scan.
-        return dashboard.throughput(Math.min(Math.max(minutes, 1), 1440));
+        return rollup.throughput(Math.min(Math.max(minutes, 1), 1440));
     }
 
     @GET
